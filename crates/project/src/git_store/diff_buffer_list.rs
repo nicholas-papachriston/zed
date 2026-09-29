@@ -14,6 +14,7 @@ use language::Buffer;
 use sum_tree::SumTree;
 use text::BufferId;
 use util::ResultExt;
+use worktree::EntryKind;
 use ztracing::instrument;
 
 use crate::{
@@ -329,6 +330,15 @@ impl DiffBufferList {
                 else {
                     continue;
                 };
+                let entry_kind = git_store
+                    .read(cx)
+                    .worktree_store
+                    .read(cx)
+                    .entry_for_path(&project_path, cx)
+                    .map(|entry| entry.kind);
+                if !can_load_diff_entry(entry_kind) {
+                    continue;
+                }
                 let branch_diff = self
                     .tree_diff
                     .as_ref()
@@ -362,6 +372,15 @@ impl DiffBufferList {
                 let Some(project_path) = repo.read(cx).repo_path_to_project_path(path, cx) else {
                     continue;
                 };
+                let entry_kind = git_store
+                    .read(cx)
+                    .worktree_store
+                    .read(cx)
+                    .entry_for_path(&project_path, cx)
+                    .map(|entry| entry.kind);
+                if !can_load_diff_entry(entry_kind) {
+                    continue;
+                }
                 let task = Self::load_buffer(
                     self.diff_base.clone(),
                     Some(branch_diff.clone()),
@@ -473,6 +492,10 @@ impl DiffBufferList {
     }
 }
 
+fn can_load_diff_entry(entry_kind: Option<EntryKind>) -> bool {
+    entry_kind.is_none_or(|kind| kind.is_file())
+}
+
 fn build_statuses(
     snapshot: &RepositorySnapshot,
     committed_tree_diff: &TreeDiff,
@@ -544,4 +567,18 @@ pub struct DiffBuffer {
     pub file_status: FileStatus,
     /// Not started until polled, so the consumer controls load concurrency.
     pub load: LocalBoxFuture<'static, Result<LoadedDiffBuffer>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diff_entries_exclude_directories() {
+        assert!(can_load_diff_entry(None));
+        assert!(can_load_diff_entry(Some(EntryKind::File)));
+        assert!(!can_load_diff_entry(Some(EntryKind::Dir)));
+        assert!(!can_load_diff_entry(Some(EntryKind::PendingDir)));
+        assert!(!can_load_diff_entry(Some(EntryKind::UnloadedDir)));
+    }
 }
