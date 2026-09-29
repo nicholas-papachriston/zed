@@ -1122,6 +1122,21 @@
     //
     // Default: true
     "show_all_repositories": true,
+    // Which repositories to list when show_all_repositories is true.
+    //
+    // changed: the primary repository, the active repository, and repositories with changes.
+    // all: every open repository.
+    //
+    // Default: changed
+    "all_repositories_filter": "changed",
+    // How to group repositories when show_all_repositories is true.
+    //
+    // parent: each parent's children sit under that parent.
+    // project: nested repositories sit under one project group.
+    // flat: every repository is its own section.
+    //
+    // Default: parent
+    "all_repositories_grouping": "parent",
     // Whether the git panel should open on startup.
     //
     // Default: false

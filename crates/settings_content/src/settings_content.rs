@@ -791,6 +791,23 @@ pub struct GitPanelSettingsContent {
     /// Default: false
     pub show_all_repositories: Option<bool>,
 
+    /// Which repositories to list when `show_all_repositories` is true.
+    ///
+    /// `changed` lists the primary repository, the active repository, and every
+    /// repository that has changes. `all` lists every open repository.
+    ///
+    /// Default: changed
+    pub all_repositories_filter: Option<GitPanelAllRepositoriesFilter>,
+
+    /// How to group repositories when `show_all_repositories` is true.
+    ///
+    /// `parent` puts each parent's children under that parent.
+    /// `project` puts every nested repository under one group.
+    /// `flat` lists every repository as its own section.
+    ///
+    /// Default: parent
+    pub all_repositories_grouping: Option<GitPanelAllRepositoriesGrouping>,
+
     /// Whether to show the addition/deletion change count next to each file in the Git panel.
     ///
     /// Default: true
@@ -884,6 +901,54 @@ pub enum GitPanelGroupBy {
     #[default]
     Status,
     Staging,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GitPanelAllRepositoriesFilter {
+    /// List the primary repository, the active repository, and repositories with changes.
+    #[default]
+    Changed,
+    /// List every open repository.
+    All,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GitPanelAllRepositoriesGrouping {
+    /// Put every nested repository under one project group.
+    Project,
+    /// Put each parent's children under that parent.
+    #[default]
+    Parent,
+    /// List every repository as its own section.
+    Flat,
 }
 
 #[derive(
