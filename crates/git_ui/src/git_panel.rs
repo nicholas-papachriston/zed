@@ -12913,6 +12913,86 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_file_actions_resolve_each_marked_entry_in_its_repository(
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        cx.update(|cx| {
+            SettingsStore::update_global(cx, |store, cx| {
+                store.update_user_settings(cx, |settings| {
+                    let panel = settings.git_panel.get_or_insert_default();
+                    panel.show_all_repositories = Some(true);
+                    panel.tree_view = Some(false);
+                });
+            });
+        });
+        let fs = FakeFs::new(cx.background_executor.clone());
+        let roots = [path!("/root/a"), path!("/root/b")];
+        for root in roots {
+            fs.insert_tree(root, json!({ ".git": {}, "new.txt": "new" }))
+                .await;
+            fs.set_status_for_repo(
+                &Path::new(root).join(".git"),
+                &[("new.txt", FileStatus::Untracked)],
+            );
+        }
+        let project = Project::test(fs.clone(), roots.map(Path::new), cx).await;
+        let repositories = project.read_with(cx, |project, cx| {
+            roots.map(|path| {
+                project
+                    .git_store()
+                    .read(cx)
+                    .repositories()
+                    .values()
+                    .find(|repo| repo.read(cx).work_directory_abs_path.as_ref() == Path::new(path))
+                    .unwrap()
+                    .clone()
+            })
+        });
+        let ids = repositories
+            .each_ref()
+            .map(|repo| repo.read_with(cx, |repo, _| repo.id));
+        repositories[0].update(cx, |repo, cx| repo.set_as_active_repository(cx));
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .unwrap();
+        let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
+        let panel = workspace.update_in(&mut cx, GitPanel::new);
+        await_git_panel_entries(&panel, &mut cx).await;
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            let keys = ids.map(|repository_id| ChangeKey {
+                repository_id,
+                repo_path: repo_path("new.txt"),
+            });
+            panel.selected_entry = panel.entry_by_change_key(&keys[1]);
+            panel.marked_entries = HashSet::from_iter(keys);
+            panel.copy_path(&CopyPath, window, cx);
+            assert_eq!(
+                cx.read_from_clipboard().and_then(|item| item.text()),
+                Some(format!(
+                    "{}\n{}",
+                    path!("/root/a/new.txt"),
+                    path!("/root/b/new.txt")
+                ))
+            );
+            panel.add_to_gitignore(&git::AddToGitignore, window, cx);
+        });
+        cx.run_until_parked();
+
+        for root in roots {
+            assert_eq!(
+                fs.load(&Path::new(root).join(".gitignore"))
+                    .await
+                    .expect(".gitignore should exist"),
+                "new.txt\n"
+            );
+        }
+    }
+
+    #[gpui::test]
     async fn test_ignore_actions_use_multiple_selected_entries(cx: &mut TestAppContext) {
         init_test(cx);
         let (fs, _, panel, mut cx) = setup_flat_marks_fixture(cx).await;
