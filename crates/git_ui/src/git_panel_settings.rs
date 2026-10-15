@@ -4,8 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{
     FolderIndicator, GitPanelAllRepositoriesFilter, GitPanelAllRepositoriesGrouping,
-    GitPanelClickBehavior, GitPanelGroupBy, GitPanelSortBy, IntoGpui, RegisterSetting, Settings,
-    StatusStyle,
+    GitPanelClickBehavior, GitPanelCommitEditor, GitPanelGroupBy, GitPanelSortBy, IntoGpui,
+    RegisterSetting, Settings, StatusStyle,
 };
 use ui::scrollbars::{ScrollbarVisibility, ShowScrollbar};
 use workspace::dock::DockPosition;
@@ -37,6 +37,7 @@ pub struct GitPanelSettings {
     pub starts_open: bool,
     pub commit_title_max_length: usize,
     pub entry_primary_click_action: GitPanelClickBehavior,
+    pub commit_editor: GitPanelCommitEditor,
 }
 
 #[derive(Default)]
@@ -89,6 +90,7 @@ impl Settings for GitPanelSettings {
             starts_open: git_panel.starts_open.unwrap(),
             commit_title_max_length: git_panel.commit_title_max_length.unwrap(),
             entry_primary_click_action: git_panel.entry_primary_click_action.unwrap(),
+            commit_editor: git_panel.commit_editor.unwrap(),
         }
     }
 }
