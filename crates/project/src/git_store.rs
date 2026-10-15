@@ -2588,6 +2588,12 @@ impl GitStore {
         if matches!(event, RepositoryEvent::BranchListChanged) {
             self.refresh_diff_base_for_repo(id, cx);
         }
+        if matches!(
+            event,
+            RepositoryEvent::StatusesChanged | RepositoryEvent::HeadChanged
+        ) {
+            self.refresh_submodule_parent_status(id, cx);
+        }
 
         cx.emit(GitStoreEvent::RepositoryUpdated(
             id,
@@ -2596,13 +2602,14 @@ impl GitStore {
         ))
     }
 
-    /// Refreshes each parent gitlink in a chain of modern submodules.
+    /// Refreshes the parent's gitlink status after a submodule's HEAD or
+    /// working tree changes.
     ///
-    /// A nested repository's HEAD can change without producing a filesystem
-    /// event that is assigned to its parent: worktree events intentionally go
-    /// to the innermost repository. For submodules, that would leave the
-    /// parent's cached gitlink status stale after a branch switch.
-    fn refresh_submodule_ancestor_statuses(
+    /// Filesystem events are routed only to the innermost repository, and a
+    /// submodule's git directory lives under the parent's `.git/modules`, so no
+    /// event reaches the parent when a submodule is edited or committed to.
+    /// Deeper chains propagate through the parent's own `StatusesChanged`.
+    fn refresh_submodule_parent_status(
         &mut self,
         changed_repository_id: RepositoryId,
         cx: &mut Context<Self>,
@@ -2613,51 +2620,37 @@ impl GitStore {
         let updates_tx = downstream
             .as_ref()
             .map(|downstream| downstream.updates_tx.clone());
-        let Some(mut child_snapshot) = self
+        let Some(child_snapshot) = self
             .repositories
             .get(&changed_repository_id)
             .map(|repository| repository.read(cx).snapshot.clone())
         else {
             return;
         };
-        let mut visited: HashSet<RepositoryId> = HashSet::default();
-        visited.insert(changed_repository_id);
-        let mut ancestors = Vec::new();
+        let Some((parent, submodule_path, _)) = self
+            .repositories
+            .iter()
+            .filter(|(repository_id, _)| **repository_id != changed_repository_id)
+            .filter_map(|(_, repository)| {
+                let parent_snapshot = &repository.read(cx).snapshot;
+                child_snapshot
+                    .modern_submodule_path_in(parent_snapshot)
+                    .map(|submodule_path| {
+                        (
+                            repository.clone(),
+                            submodule_path,
+                            parent_snapshot.work_directory_abs_path.components().count(),
+                        )
+                    })
+            })
+            .max_by_key(|(_, _, depth)| *depth)
+        else {
+            return;
+        };
 
-        loop {
-            let Some((parent_id, parent, parent_snapshot, repo_path, _)) = self
-                .repositories
-                .iter()
-                .filter(|(repository_id, _)| !visited.contains(repository_id))
-                .filter_map(|(repository_id, repository)| {
-                    let parent_snapshot = repository.read(cx).snapshot.clone();
-                    child_snapshot
-                        .modern_submodule_path_in(&parent_snapshot)
-                        .map(|repo_path| {
-                            (
-                                *repository_id,
-                                repository.clone(),
-                                parent_snapshot.clone(),
-                                repo_path,
-                                parent_snapshot.work_directory_abs_path.components().count(),
-                            )
-                        })
-                })
-                .max_by_key(|(_, _, _, _, depth)| *depth)
-            else {
-                break;
-            };
-
-            visited.insert(parent_id);
-            ancestors.push((parent, repo_path));
-            child_snapshot = parent_snapshot;
-        }
-
-        for (repository, repo_path) in ancestors {
-            repository.update(cx, |repository, cx| {
-                repository.paths_changed(vec![repo_path], updates_tx.clone(), cx);
-            });
-        }
+        parent.update(cx, |parent, cx| {
+            parent.paths_changed(vec![submodule_path], updates_tx, cx);
+        });
     }
 
     fn on_jobs_updated(&mut self, _: Entity<Repository>, _: &JobsUpdated, cx: &mut Context<Self>) {
@@ -9910,7 +9903,6 @@ impl Repository {
         base_branch: Option<String>,
     ) -> oneshot::Receiver<Result<()>> {
         let id = self.id;
-        let git_store = self.git_store.clone();
         let status_msg = if let Some(ref base) = base_branch {
             format!("git switch -c {branch_name} {base}").into()
         } else {
@@ -9919,18 +9911,10 @@ impl Repository {
         self.send_job(
             "create_branch",
             Some(status_msg),
-            move |repo, mut cx| async move {
+            move |repo, _cx| async move {
                 match repo {
                     RepositoryState::Local(LocalRepositoryState { backend, .. }) => {
-                        let result = backend.create_branch(branch_name, base_branch).await;
-                        if result.is_ok() {
-                            git_store
-                                .update(&mut cx, |git_store, cx| {
-                                    git_store.refresh_submodule_ancestor_statuses(id, cx);
-                                })
-                                .ok();
-                        }
-                        result
+                        backend.create_branch(branch_name, base_branch).await
                     }
                     RepositoryState::Remote(RemoteRepositoryState { project_id, client }) => {
                         client
@@ -9951,22 +9935,13 @@ impl Repository {
 
     pub fn change_branch(&mut self, branch_name: String) -> oneshot::Receiver<Result<()>> {
         let id = self.id;
-        let git_store = self.git_store.clone();
         self.send_job(
             "change_branch",
             Some(format!("git switch {branch_name}").into()),
-            move |repo, mut cx| async move {
+            move |repo, _cx| async move {
                 match repo {
                     RepositoryState::Local(LocalRepositoryState { backend, .. }) => {
-                        let result = backend.change_branch(branch_name).await;
-                        if result.is_ok() {
-                            git_store
-                                .update(&mut cx, |git_store, cx| {
-                                    git_store.refresh_submodule_ancestor_statuses(id, cx);
-                                })
-                                .ok();
-                        }
-                        result
+                        backend.change_branch(branch_name).await
                     }
                     RepositoryState::Remote(RemoteRepositoryState { project_id, client }) => {
                         client
