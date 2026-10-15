@@ -19902,6 +19902,173 @@ async fn test_git_worktrees_and_submodules(cx: &mut gpui::TestAppContext) {
     });
 }
 
+#[allow(clippy::disallowed_methods)]
+#[track_caller]
+fn git_run(args: &[&str], work_dir: &Path) {
+    let output = git_cmd(work_dir)
+        .args(args)
+        .output()
+        .expect("Failed to run git");
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+struct SubmoduleFixture {
+    _root: TempTree,
+    project: Entity<Project>,
+    worktree: Entity<Worktree>,
+    parent: Entity<Repository>,
+    submodule: Entity<Repository>,
+    submodule_dir: PathBuf,
+}
+
+/// A parent repository with an absorbed submodule at `sub`, both committed
+/// and clean.
+async fn submodule_fixture(cx: &mut gpui::TestAppContext) -> SubmoduleFixture {
+    init_test(cx);
+    cx.executor().allow_parking();
+
+    let root = TempTree::new(json!({
+        "upstream": { "a.txt": "a\n" },
+        "project": { "README.md": "parent\n" },
+    }));
+    let upstream_dir = root.path().join("upstream");
+    git_init(&upstream_dir);
+    git_add("a.txt", &upstream_dir);
+    git_commit("init submodule", &upstream_dir);
+
+    let parent_dir = root.path().join("project");
+    git_init(&parent_dir);
+    git_add("README.md", &parent_dir);
+    git_commit("init parent", &parent_dir);
+    git_run(
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "--quiet",
+            upstream_dir.to_str().expect("utf-8 temp path"),
+            "sub",
+        ],
+        &parent_dir,
+    );
+    git_commit("add submodule", &parent_dir);
+    let submodule_dir = parent_dir.join("sub");
+
+    let project = Project::test(RealFs::new(None, cx.executor()), [parent_dir.as_path()], cx).await;
+    let worktree = project.read_with(cx, |project, cx| project.worktrees(cx).next().unwrap());
+    worktree.flush_fs_events(cx).await;
+    project
+        .update(cx, |project, cx| project.git_scans_complete(cx))
+        .await;
+    cx.executor().run_until_parked();
+
+    let (parent, submodule) = project.read_with(cx, |project, cx| {
+        let repositories = project.repositories(cx);
+        let repository_for = |suffix: &str| {
+            repositories
+                .values()
+                .find(|repository| {
+                    repository
+                        .read(cx)
+                        .work_directory_abs_path
+                        .ends_with(suffix)
+                })
+                .cloned()
+                .unwrap_or_else(|| panic!("missing repository ending in {suffix}"))
+        };
+        (repository_for("project"), repository_for("project/sub"))
+    });
+
+    let fixture = SubmoduleFixture {
+        _root: root,
+        project,
+        worktree,
+        parent,
+        submodule,
+        submodule_dir,
+    };
+    fixture.settle(cx).await;
+    assert_eq!(fixture.parent_status_for_submodule(cx), None);
+    fixture
+}
+
+impl SubmoduleFixture {
+    async fn settle(&self, cx: &mut gpui::TestAppContext) {
+        self.worktree.flush_fs_events(cx).await;
+        self.project
+            .update(cx, |project, cx| project.git_scans_complete(cx))
+            .await;
+        cx.executor().run_until_parked();
+        for repository in [&self.submodule, &self.parent] {
+            repository
+                .update(cx, |repository, _| repository.barrier())
+                .await
+                .unwrap();
+            cx.executor().run_until_parked();
+        }
+    }
+
+    fn parent_status_for_submodule(&self, cx: &mut gpui::TestAppContext) -> Option<FileStatus> {
+        self.parent.read_with(cx, |repository, _| {
+            repository
+                .status_for_path(&repo_path("sub"))
+                .map(|entry| entry.status)
+        })
+    }
+}
+
+#[gpui::test]
+async fn test_editing_inside_submodule_refreshes_parent_gitlink_status(
+    cx: &mut gpui::TestAppContext,
+) {
+    let fixture = submodule_fixture(cx).await;
+
+    std::fs::write(fixture.submodule_dir.join("a.txt"), "a\nb\n").unwrap();
+    fixture.settle(cx).await;
+    assert_eq!(
+        fixture.submodule.read_with(cx, |repository, _| repository
+            .status_for_path(&repo_path("a.txt"))
+            .map(|entry| entry.status)),
+        Some(StatusCode::Modified.worktree()),
+        "the submodule itself sees the edit"
+    );
+    assert_eq!(
+        fixture.parent_status_for_submodule(cx),
+        Some(StatusCode::Modified.worktree()),
+        "a dirty submodule working tree shows as a modified gitlink in the parent"
+    );
+
+    std::fs::write(fixture.submodule_dir.join("a.txt"), "a\n").unwrap();
+    fixture.settle(cx).await;
+    assert_eq!(
+        fixture.parent_status_for_submodule(cx),
+        None,
+        "reverting the submodule edit clears the parent's gitlink status"
+    );
+}
+
+#[gpui::test]
+async fn test_committing_inside_submodule_refreshes_parent_gitlink_status(
+    cx: &mut gpui::TestAppContext,
+) {
+    let fixture = submodule_fixture(cx).await;
+
+    std::fs::write(fixture.submodule_dir.join("new.txt"), "new\n").unwrap();
+    git_add("new.txt", &fixture.submodule_dir);
+    git_commit("second", &fixture.submodule_dir);
+    fixture.settle(cx).await;
+    assert_eq!(
+        fixture.parent_status_for_submodule(cx),
+        Some(StatusCode::Modified.worktree()),
+        "a new submodule commit moves the gitlink away from the parent's index"
+    );
+}
+
 #[gpui::test]
 async fn test_switching_submodule_branch_refreshes_parent_status(cx: &mut gpui::TestAppContext) {
     init_test(cx);

@@ -16701,6 +16701,156 @@ mod tests {
         });
     }
 
+    #[allow(clippy::disallowed_methods)]
+    #[track_caller]
+    fn run_git(args: &[&str], work_dir: &Path) {
+        let output = std::process::Command::new("git")
+            .current_dir(work_dir)
+            .env("GIT_CONFIG_GLOBAL", "")
+            .env("GIT_CONFIG_SYSTEM", "")
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "test@zed.dev")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "test@zed.dev")
+            .args(args)
+            .output()
+            .expect("failed to run git");
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[gpui::test]
+    async fn test_editing_inside_submodule_shows_gitlink_row(cx: &mut TestAppContext) {
+        init_test(cx);
+        cx.executor().allow_parking();
+
+        let root = util::test::TempTree::new(json!({
+            "upstream": { "a.txt": "a\n" },
+            "project": { "README.md": "parent\n" },
+        }));
+        let upstream_dir = root.path().join("upstream");
+        run_git(&["init", "-b", "main"], &upstream_dir);
+        run_git(&["add", "a.txt"], &upstream_dir);
+        run_git(&["commit", "-m", "init submodule"], &upstream_dir);
+        let parent_dir = root.path().join("project");
+        run_git(&["init", "-b", "main"], &parent_dir);
+        run_git(&["add", "README.md"], &parent_dir);
+        run_git(&["commit", "-m", "init parent"], &parent_dir);
+        run_git(
+            &[
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "--quiet",
+                upstream_dir.to_str().expect("utf-8 temp path"),
+                "sub",
+            ],
+            &parent_dir,
+        );
+        run_git(&["commit", "-m", "add submodule"], &parent_dir);
+
+        let project = Project::test(
+            fs::RealFs::new(None, cx.executor()),
+            [parent_dir.as_path()],
+            cx,
+        )
+        .await;
+        project
+            .update(cx, |project, cx| project.git_scans_complete(cx))
+            .await;
+        cx.run_until_parked();
+        let (parent, submodule) = project.read_with(cx, |project, cx| {
+            let repositories = project.git_store().read(cx).repositories();
+            let repository_for = |suffix: &str| {
+                repositories
+                    .values()
+                    .find(|repository| {
+                        repository
+                            .read(cx)
+                            .work_directory_abs_path
+                            .ends_with(suffix)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| panic!("missing repository ending in {suffix}"))
+            };
+            (repository_for("project"), repository_for("project/sub"))
+        });
+        let parent_id = parent.read_with(cx, |repository, _| repository.id);
+        parent.update(cx, |repository, cx| repository.set_as_active_repository(cx));
+
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .unwrap();
+        let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
+        cx.update(|_window, cx| {
+            SettingsStore::update_global(cx, |store, cx| {
+                store.update_user_settings(cx, |settings| {
+                    let git_panel = settings.git_panel.get_or_insert_default();
+                    git_panel.show_all_repositories = Some(true);
+                    git_panel.all_repositories_filter = Some(GitPanelAllRepositoriesFilter::All);
+                    git_panel.tree_view = Some(false);
+                })
+            });
+        });
+        cx.run_until_parked();
+        let panel = workspace.update_in(&mut cx, GitPanel::new);
+        await_git_panel_entries(&panel, &mut cx).await;
+
+        let gitlink_rows = |panel: &GitPanel| {
+            panel
+                .entries
+                .iter()
+                .filter_map(|entry| match entry {
+                    GitListEntry::SubmoduleCommit(gitlink) => Some((
+                        gitlink.parent_repository_id,
+                        gitlink.status_entry.repo_path.clone(),
+                        gitlink.status_entry.status,
+                    )),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        panel.read_with(&cx, |panel, _| assert_eq!(gitlink_rows(panel), vec![]));
+
+        std::fs::write(parent_dir.join("sub/a.txt"), "a\nb\n").unwrap();
+        let submodule_saw_edit = |cx: &mut VisualTestContext| {
+            submodule.read_with(cx, |repository, _| {
+                repository.status_for_path(&repo_path("a.txt")).is_some()
+            })
+        };
+        for _ in 0..200 {
+            if submodule_saw_edit(&mut cx) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+            cx.executor().advance_clock(Duration::from_millis(100));
+            cx.run_until_parked();
+        }
+        assert!(submodule_saw_edit(&mut cx), "the submodule sees the edit");
+        for repository in [&submodule, &parent] {
+            repository
+                .update(&mut cx, |repository, _| repository.barrier())
+                .await
+                .unwrap();
+            cx.run_until_parked();
+        }
+        await_git_panel_entries(&panel, &mut cx).await;
+
+        panel.read_with(&cx, |panel, _| {
+            assert_eq!(
+                gitlink_rows(panel),
+                vec![(parent_id, repo_path("sub"), StatusCode::Modified.worktree())],
+                "the submodule row shows the parent's modified gitlink"
+            );
+        });
+    }
+
     #[gpui::test]
     async fn test_changed_filter_lists_dirty_submodules_under_parent_group(
         cx: &mut TestAppContext,
