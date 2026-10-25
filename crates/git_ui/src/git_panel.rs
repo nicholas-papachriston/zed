@@ -20104,6 +20104,112 @@ mod tests {
         }
     }
 
+    #[gpui::test]
+    async fn test_discard_marked_rows_scope_follows_section_across_repositories(
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        cx.update(|cx| {
+            SettingsStore::update_global(cx, |store, cx| {
+                store.update_user_settings(cx, |settings| {
+                    let panel = settings.git_panel.get_or_insert_default();
+                    panel.show_all_repositories = Some(true);
+                    panel.group_by = Some(GitPanelGroupBy::Staging);
+                });
+            });
+        });
+        let fs = FakeFs::new(cx.background_executor.clone());
+        let roots = [path!("/root/a"), path!("/root/b")];
+        for root in roots {
+            fs.insert_tree(root, json!({ ".git": {}, "partial.txt": "unstaged\n" }))
+                .await;
+            let dot_git = Path::new(root).join(".git");
+            fs.set_head_for_repo(
+                &dot_git,
+                &[("partial.txt", "head\n".to_string())],
+                "deadbeef",
+            );
+            fs.set_index_for_repo(&dot_git, &[("partial.txt", "staged\n".to_string())]);
+        }
+        let project = Project::test(fs.clone(), roots.map(Path::new), cx).await;
+        let ids = project.read_with(cx, |project, cx| {
+            roots.map(|root| {
+                project
+                    .git_store()
+                    .read(cx)
+                    .repositories()
+                    .values()
+                    .map(|repository| repository.read(cx))
+                    .find(|repository| {
+                        repository.work_directory_abs_path.as_ref() == Path::new(root)
+                    })
+                    .unwrap()
+                    .id
+            })
+        });
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .unwrap();
+        let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
+        let panel = workspace.update_in(&mut cx, GitPanel::new);
+        await_git_panel_entries(&panel, &mut cx).await;
+        cx.run_until_parked();
+
+        // The same path in two repositories: discard A's unstaged half and all
+        // of B's changes in one operation.
+        panel.update_in(&mut cx, |panel, window, cx| {
+            let row = |panel: &GitPanel, repository_id, section| {
+                panel
+                    .entry_by_change_key_in_section(
+                        &ChangeKey {
+                            repository_id,
+                            repo_path: repo_path("partial.txt"),
+                        },
+                        section,
+                    )
+                    .unwrap()
+            };
+            let a_unstaged = row(panel, ids[0], Section::Unstaged);
+            let b_staged = row(panel, ids[1], Section::Staged);
+            mark_file_row(panel, a_unstaged);
+            mark_file_row(panel, b_staged);
+            assert!(!panel.row_is_marked(row(panel, ids[0], Section::Staged)));
+            assert!(!panel.row_is_marked(row(panel, ids[1], Section::Unstaged)));
+            panel.selected_entry = Some(a_unstaged);
+            panel.revert_selected(&RestoreFile { skip_prompt: true }, window, cx);
+        });
+        let (message, _) = cx
+            .pending_prompt()
+            .expect("cross-repository discard must confirm once");
+        assert_eq!(message, "Discard changes to these files?");
+        cx.simulate_prompt_answer("Discard Changes");
+        cx.run_until_parked();
+        await_git_panel_entries(&panel, &mut cx).await;
+
+        let contents = async |root: &str| {
+            let worktree = fs.load(&Path::new(root).join("partial.txt")).await.unwrap();
+            let index = fs
+                .with_git_state(&Path::new(root).join(".git"), false, |state| {
+                    state
+                        .index_contents
+                        .get(&repo_path("partial.txt"))
+                        .map(|content| String::from_utf8_lossy(content).into_owned())
+                })
+                .unwrap();
+            (worktree, index)
+        };
+        assert_eq!(
+            contents(roots[0]).await,
+            ("staged\n".into(), Some("staged\n".into()))
+        );
+        assert_eq!(
+            contents(roots[1]).await,
+            ("head\n".into(), Some("head\n".into()))
+        );
+    }
+
     async fn setup_flat_marks_fixture(
         cx: &mut TestAppContext,
     ) -> (
