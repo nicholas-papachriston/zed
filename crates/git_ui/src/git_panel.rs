@@ -22196,6 +22196,132 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_branch_mode_lists_only_the_active_repository(cx: &mut TestAppContext) {
+        init_test(cx);
+        cx.update(|cx| {
+            SettingsStore::update_global(cx, |store, cx| {
+                store.update_user_settings(cx, |settings| {
+                    settings
+                        .git_panel
+                        .get_or_insert_default()
+                        .show_all_repositories = Some(true);
+                });
+            });
+        });
+        let fs = FakeFs::new(cx.background_executor.clone());
+        let roots = [path!("/root/a"), path!("/root/b")];
+        for root in roots {
+            fs.insert_tree(
+                root,
+                json!({ ".git": {}, "committed.txt": "new", "dirty.txt": "dirty" }),
+            )
+            .await;
+            let dot_git = Path::new(root).join(".git");
+            fs.set_head_and_index_for_repo(
+                &dot_git,
+                &[
+                    ("committed.txt", "new".into()),
+                    ("dirty.txt", "clean".into()),
+                ],
+            );
+            fs.set_merge_base_content_for_repo(
+                &dot_git,
+                &[
+                    ("committed.txt", "old".into()),
+                    ("dirty.txt", "clean".into()),
+                ],
+            );
+        }
+        let project = Project::test(fs.clone(), roots.map(Path::new), cx).await;
+        let repositories = project.read_with(cx, |project, cx| {
+            roots.map(|root| {
+                project
+                    .git_store()
+                    .read(cx)
+                    .repositories()
+                    .values()
+                    .find(|repository| {
+                        repository.read(cx).work_directory_abs_path.as_ref() == Path::new(root)
+                    })
+                    .unwrap()
+                    .clone()
+            })
+        });
+        let ids = repositories
+            .each_ref()
+            .map(|repository| repository.read_with(cx, |repository, _| repository.id));
+        repositories[0].update(cx, |repository, cx| repository.set_as_active_repository(cx));
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .unwrap();
+        let mut cx = VisualTestContext::from_window(window_handle.into(), cx);
+        let cx = &mut cx;
+        let panel = workspace.update_in(cx, GitPanel::new);
+        settle_branch_mode(cx);
+
+        let rows = |panel: &Entity<GitPanel>, cx: &mut VisualTestContext| {
+            panel.read_with(cx, |panel, _| {
+                let headers = panel
+                    .entries
+                    .iter()
+                    .filter_map(|entry| match entry {
+                        GitListEntry::RepositoryHeader(header) => Some(header.repository_id),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                let files = panel
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, entry)| {
+                        Some((
+                            panel.repository_id_for_entry_index(index)?,
+                            entry.status_entry()?.repo_path.as_unix_str().to_owned(),
+                        ))
+                    })
+                    .collect::<Vec<_>>();
+                (headers, files)
+            })
+        };
+        let uncommitted_by_repository = (
+            vec![ids[0], ids[1]],
+            vec![
+                (ids[0], "dirty.txt".to_owned()),
+                (ids[1], "dirty.txt".to_owned()),
+            ],
+        );
+        assert_eq!(rows(&panel, cx), uncommitted_by_repository);
+
+        panel.update_in(cx, |panel, window, cx| panel.enter_branch_mode(window, cx));
+        settle_branch_mode(cx);
+        assert_eq!(
+            rows(&panel, cx),
+            (
+                Vec::new(),
+                vec![
+                    (ids[0], "committed.txt".to_owned()),
+                    (ids[0], "dirty.txt".to_owned()),
+                ],
+            )
+        );
+        assert_eq!(uncommitted_paths(&panel, cx), ["dirty.txt"]);
+        panel.read_with(cx, |panel, _| {
+            assert_eq!(
+                panel.section_file_counts.get(&(ids[0], Section::Branch)),
+                Some(&2)
+            );
+        });
+
+        panel.update_in(cx, |panel, window, cx| {
+            panel.enter_uncommitted_mode(window, cx)
+        });
+        settle_branch_mode(cx);
+        assert_eq!(rows(&panel, cx), uncommitted_by_repository);
+    }
+
+    #[gpui::test]
     async fn test_branch_mode_rows_across_base_switches(cx: &mut TestAppContext) {
         let (test, mut cx) = setup_branch_mode_test(cx, Some("refs/remotes/origin/main")).await;
         let cx = &mut cx;
