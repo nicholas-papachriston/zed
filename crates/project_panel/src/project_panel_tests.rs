@@ -12817,6 +12817,7 @@ async fn test_focus_follows_mouse_into_blank_area(cx: &mut gpui::TestAppContext)
                     enabled: Some(true),
                     debounce_ms: Some(100),
                 });
+                settings.project_panel.get_or_insert_default().dock = Some(DockSide::Right);
             });
         });
     });
@@ -12859,7 +12860,7 @@ async fn test_focus_follows_mouse_into_blank_area(cx: &mut gpui::TestAppContext)
     });
 
     // Hover over the blank space below the last entry in the project panel,
-    // which lives in the right dock by default.
+    // which this test docks on the right.
     cx.simulate_mouse_move(point(px(1800.), px(600.)), None, Modifiers::none());
     cx.executor().advance_clock(Duration::from_millis(200));
     cx.run_until_parked();

@@ -38,7 +38,7 @@
     // "calt": false
   },
   // The default font size for text in the editor
-  "buffer_font_size": 15,
+  "buffer_font_size": 16,
   // The weight of the editor font in standard CSS units from 100 to 900.
   "buffer_font_weight": 400,
   // Set the buffer's line height.
@@ -595,7 +595,7 @@
     "code_actions": false,
   },
   // Whether to allow windows to tab together based on the user's tabbing preference (macOS only).
-  "use_system_window_tabs": false,
+  "use_system_window_tabs": true,
   // Which fullscreen mode the `zed::ToggleFullScreen` action enters (macOS only).
   //
   // 1. Use macOS's native fullscreen, which moves the window into its own Mission Control space.
@@ -609,7 +609,7 @@
     // When to show the title bar: "always" | "never" | "hide_in_full_screen".
     "show": "always",
     // Whether to show git status indicators on the branch icon in the titlebar.
-    "show_branch_status_icon": false,
+    "show_branch_status_icon": true,
     // Whether to show the branch name button in the titlebar.
     "show_branch_name": true,
     // Whether to show the worktree name button in the titlebar.
@@ -625,7 +625,7 @@
     // Whether to show the sign in button in the titlebar.
     "show_sign_in": true,
     // Whether to show the menus in the titlebar.
-    "show_menus": false,
+    "show_menus": true,
     // Whether to open the menus in the titlebar on hover.
     "open_menus_on_hover": false,
     // The layout of window control buttons in the title bar (Linux only).
@@ -877,7 +877,7 @@
     // Default width of the project panel.
     "default_width": 240,
     // Where to dock the project panel. Can be 'left' or 'right'.
-    "dock": "right",
+    "dock": "left",
     // Spacing between worktree entries in the project panel. Can be 'comfortable' or 'standard'.
     "entry_spacing": "comfortable",
     // Whether to show file icons in the project panel.
@@ -1005,7 +1005,7 @@
     // Default width of the outline panel.
     "default_width": 300,
     // Where to dock the outline panel. Can be 'left' or 'right'.
-    "dock": "right",
+    "dock": "left",
     // Whether to show file icons in the outline panel.
     "file_icons": true,
     // What to show for directories in the outline panel.
@@ -1069,7 +1069,7 @@
     // Whether to show the collaboration panel button in the status bar.
     "button": true,
     // Where to dock the collaboration panel. Can be 'left' or 'right'.
-    "dock": "right",
+    "dock": "left",
     // Default width of the collaboration panel.
     "default_width": 240,
   },
@@ -1083,7 +1083,7 @@
     // Whether to show the git panel button in the status bar.
     "button": true,
     // Where to dock the git panel. Can be 'left' or 'right'.
-    "dock": "right",
+    "dock": "left",
     // Default width of the git panel.
     "default_width": 360,
     // Style of the git status indicator in the panel.
@@ -1193,7 +1193,7 @@
     // Whether to show the agent panel button in the status bar.
     "button": true,
     // Where to dock the agent panel. Can be 'left', 'right' or 'bottom'.
-    "dock": "left",
+    "dock": "right",
     // Whether the agent panel should use flexible (proportional) sizing when docked
     // to the left or right. When enabled, `default_width` does not control the panel
     // width, and resetting the panel restores the default proportion.
@@ -1393,7 +1393,7 @@
     // "always" - Always play the sound
     //
     // Default: never
-    "play_sound_when_agent_done": "never",
+    "play_sound_when_agent_done": "always",
     // Whether to keep the system awake while agent threads are running.
     //
     // Default: true
@@ -1425,7 +1425,7 @@
     // Whether to always use cmd-enter (or ctrl-enter on Linux or Windows) to send messages in the agent panel.
     //
     // Default: false
-    "use_modifier_to_send": false,
+    "use_modifier_to_send": true,
     // Minimum number of lines to display in the agent message editor.
     //
     // Default: 4
@@ -1493,7 +1493,7 @@
   //     "autosave": "on_focus_change",
   // 4. Save when idle for a certain amount of time:
   //     "autosave": { "after_delay": {"milliseconds": 500} },
-  "autosave": "off",
+  "autosave": { "after_delay": { "milliseconds": 1000 } },
   // Maximum number of tabs per pane. Unset for unlimited.
   "max_tabs": null,
   // Settings related to the editor's tab bar.
@@ -1519,12 +1519,12 @@
   // Settings related to the editor's tabs
   "tabs": {
     // Show git status colors in the editor tabs.
-    "git_status": false,
+    "git_status": true,
     // Position of the close button on the editor tabs.
     // One of: ["right", "left"]
     "close_position": "right",
     // Whether to show the file icon for a tab.
-    "file_icons": false,
+    "file_icons": true,
     // Controls the appearance behavior of the tab's close button.
     //
     // 1. Show it just upon hovering the tab. (default)
@@ -1553,7 +1553,7 @@
     //    "errors"
     // 3. Mark files with errors and warnings:
     //    "all"
-    "show_diagnostics": "off",
+    "show_diagnostics": "all",
   },
   // Settings related to preview tabs.
   "preview_tabs": {
@@ -1565,7 +1565,7 @@
     // Whether to open tabs in preview mode when opened from the project panel with a single click or the Open action.
     "enable_preview_from_project_panel": true,
     // Whether to open tabs in preview mode when selected from the file finder.
-    "enable_preview_from_file_finder": false,
+    "enable_preview_from_file_finder": true,
     // Whether to open tabs in preview mode when opened from a multibuffer.
     "enable_preview_from_multibuffer": true,
     // Whether to open tabs in preview mode when code navigation is used to open a multibuffer.
@@ -1741,9 +1741,9 @@
   // Control what info is collected by Zed.
   "telemetry": {
     // Send debug info like crash reports.
-    "diagnostics": true,
+    "diagnostics": false,
     // Send anonymized usage data like what languages you're using Zed with.
-    "metrics": true,
+    "metrics": false,
     // Allow sending requests to Anthropic models that cannot be offered with
     // Zero Data Retention
     "anthropic_retention": false,
@@ -1881,9 +1881,9 @@
       "location": "inline",
       // The amount of padding between the end of the source line and the start
       // of the inline blame in units of em widths.
-      "padding": 7,
+      "padding": 5,
       // Whether or not to display the git commit summary on the same line.
-      "show_commit_summary": false,
+      "show_commit_summary": true,
       // The minimum column number to show the inline blame information at
       "min_column": 0,
     },
@@ -1920,12 +1920,12 @@
     //    "hunk_style": "staged_hollow"
     // 2. Show unstaged hunks hollow and staged hunks filled:
     //    "hunk_style": "unstaged_hollow"
-    "hunk_style": "staged_hollow",
+    "hunk_style": "unstaged_hollow",
     // Whether git features diff against HEAD ("head") or the default branch ("default_branch").
     "diff_base": "head",
     // Should the name or path be displayed first in the git view.
     // "path_style": "file_name_first" or "file_path_first"
-    "path_style": "file_name_first",
+    "path_style": "file_path_first",
     // Whether to show the stage and restore buttons on diff hunks.
     "show_stage_restore_buttons": true,
     // Directory where git worktrees are created, relative to the repository

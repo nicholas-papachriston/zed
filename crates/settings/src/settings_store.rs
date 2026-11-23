@@ -1697,6 +1697,7 @@ mod tests {
 
     use super::*;
     use fs::FakeFs;
+    use serde_json::json;
     use unindent::Unindent;
     use util::rel_path::rel_path;
 
@@ -1869,6 +1870,48 @@ mod tests {
             &ModelineLinesSetting { modeline_lines: 9 },
             "dev override from default settings should apply",
         );
+    }
+
+    #[gpui::test]
+    fn test_bundled_defaults_carry_fork_preferences(cx: &mut App) {
+        let store = SettingsStore::new(cx, &default_settings());
+        let defaults = serde_json::to_value(store.merged_settings()).unwrap();
+        let expected = [
+            ("/cli_default_open_behavior", json!("existing_window")),
+            ("/project_panel/dock", json!("left")),
+            ("/outline_panel/dock", json!("left")),
+            ("/collaboration_panel/dock", json!("left")),
+            ("/git_panel/dock", json!("left")),
+            ("/git_panel/sort_by", json!("path")),
+            ("/agent/dock", json!("right")),
+            ("/agent/default_profile", json!("write")),
+            ("/agent/play_sound_when_agent_done", json!("always")),
+            ("/agent/use_modifier_to_send", json!(true)),
+            (
+                "/autosave",
+                json!({ "after_delay": { "milliseconds": 1000 } }),
+            ),
+            ("/git/hunk_style", json!("unstaged_hollow")),
+            ("/git/path_style", json!("file_path_first")),
+            ("/git/inline_blame/show_commit_summary", json!(true)),
+            ("/git/inline_blame/padding", json!(5)),
+            ("/use_system_window_tabs", json!(true)),
+            ("/preview_tabs/enable_preview_from_file_finder", json!(true)),
+            ("/tabs/show_close_button", json!("hover")),
+            ("/tabs/show_diagnostics", json!("all")),
+            ("/tabs/file_icons", json!(true)),
+            ("/tabs/git_status", json!(true)),
+            ("/title_bar/show_menus", json!(true)),
+            ("/title_bar/show_branch_status_icon", json!(true)),
+            ("/format_on_save", json!("off")),
+            ("/telemetry/diagnostics", json!(false)),
+            ("/telemetry/metrics", json!(false)),
+            ("/ui_font_size", json!(16.0)),
+            ("/buffer_font_size", json!(16.0)),
+        ];
+        for (pointer, value) in expected {
+            assert_eq!(defaults.pointer(pointer), Some(&value), "{pointer}");
+        }
     }
 
     #[gpui::test]

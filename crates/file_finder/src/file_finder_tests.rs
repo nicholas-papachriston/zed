@@ -629,6 +629,7 @@ async fn test_absolute_paths_outside_project(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn test_binary_absolute_path_history(cx: &mut TestAppContext) {
     let app_state = init_test(cx);
+    disable_preview_from_file_finder(cx);
     bind_default_keymap(cx);
     app_state
         .fs
@@ -5317,6 +5318,7 @@ async fn test_open_without_dismiss_keeps_finder_open(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn test_open_without_dismiss_opens_multiple_files(cx: &mut TestAppContext) {
     let app_state = init_test(cx);
+    disable_preview_from_file_finder(cx);
     app_state
         .fs
         .as_fake()
@@ -5383,6 +5385,7 @@ async fn test_open_without_dismiss_opens_multiple_files(cx: &mut TestAppContext)
 #[gpui::test]
 async fn test_open_without_dismiss_then_confirm_closes_finder(cx: &mut TestAppContext) {
     let app_state = init_test(cx);
+    disable_preview_from_file_finder(cx);
     app_state
         .fs
         .as_fake()
@@ -5533,6 +5536,21 @@ async fn open_queried_buffer(
     });
 
     history_items
+}
+
+/// These tests open several files from the finder and expect each one to
+/// keep its own tab, so the finder must not open preview tabs.
+fn disable_preview_from_file_finder(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        cx.update_global::<SettingsStore, _>(|store, cx| {
+            store.update_user_settings(cx, |settings| {
+                settings
+                    .preview_tabs
+                    .get_or_insert_default()
+                    .enable_preview_from_file_finder = Some(false);
+            });
+        });
+    });
 }
 
 pub(crate) fn init_test(cx: &mut TestAppContext) -> Arc<AppState> {
