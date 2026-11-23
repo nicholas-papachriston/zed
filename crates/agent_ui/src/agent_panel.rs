@@ -5850,15 +5850,6 @@ impl AgentPanel {
                                         target: None,
                                     }),
                                 )
-                                .action(
-                                    "Install New Servers…",
-                                    Box::new(zed_actions::Extensions {
-                                        category_filter: Some(
-                                            zed_actions::ExtensionCategoryFilter::ContextServers,
-                                        ),
-                                        id: None,
-                                    }),
-                                )
                                 .separator()
                                 .header("Context")
                                 .action("Skills", Box::new(ManageSkills));

@@ -1831,29 +1831,6 @@ impl Render for DebugPanel {
                                         .color(Color::Muted),
                                 )
                                 .on_click(|_, _, cx| cx.open_url("https://zed.dev/docs/debugger")),
-                        )
-                        .child(
-                            Button::new(
-                                "spawn-new-session-install-extensions",
-                                "Debugger Extensions",
-                            )
-                            .start_icon(
-                                Icon::new(IconName::Blocks)
-                                    .size(IconSize::Small)
-                                    .color(Color::Muted),
-                            )
-                            .on_click(|_, window, cx| {
-                                window.dispatch_action(
-                                    zed_actions::Extensions {
-                                        category_filter: Some(
-                                            zed_actions::ExtensionCategoryFilter::DebugAdapters,
-                                        ),
-                                        id: None,
-                                    }
-                                    .boxed_clone(),
-                                    cx,
-                                );
-                            }),
                         );
 
                     let has_breakpoints = self
