@@ -2662,12 +2662,69 @@ impl GitStore {
         if matches!(event, RepositoryEvent::BranchListChanged) {
             self.refresh_diff_base_for_repo(id, cx);
         }
+        if matches!(
+            event,
+            RepositoryEvent::StatusesChanged | RepositoryEvent::HeadChanged
+        ) {
+            self.refresh_submodule_parent_status(id, cx);
+        }
 
         cx.emit(GitStoreEvent::RepositoryUpdated(
             id,
             event.clone(),
             self.active_repo_id == Some(id),
         ))
+    }
+
+    /// Refreshes the parent's gitlink status after a submodule's HEAD or
+    /// working tree changes.
+    ///
+    /// Filesystem events are routed only to the innermost repository, and a
+    /// submodule's git directory lives under the parent's `.git/modules`, so no
+    /// event reaches the parent when a submodule is edited or committed to.
+    /// Deeper chains propagate through the parent's own `StatusesChanged`.
+    fn refresh_submodule_parent_status(
+        &mut self,
+        changed_repository_id: RepositoryId,
+        cx: &mut Context<Self>,
+    ) {
+        let GitStoreState::Local { downstream, .. } = &self.state else {
+            return;
+        };
+        let updates_tx = downstream
+            .as_ref()
+            .map(|downstream| downstream.updates_tx.clone());
+        let Some(child_snapshot) = self
+            .repositories
+            .get(&changed_repository_id)
+            .map(|repository| repository.read(cx).snapshot.clone())
+        else {
+            return;
+        };
+        let Some((parent, submodule_path, _)) = self
+            .repositories
+            .iter()
+            .filter(|(repository_id, _)| **repository_id != changed_repository_id)
+            .filter_map(|(_, repository)| {
+                let parent_snapshot = &repository.read(cx).snapshot;
+                child_snapshot
+                    .modern_submodule_path_in(parent_snapshot)
+                    .map(|submodule_path| {
+                        (
+                            repository.clone(),
+                            submodule_path,
+                            parent_snapshot.work_directory_abs_path.components().count(),
+                        )
+                    })
+            })
+            .max_by_key(|(_, _, depth)| *depth)
+        else {
+            return;
+        };
+
+        parent.update(cx, |parent, cx| {
+            parent.paths_changed(vec![submodule_path], updates_tx, cx);
+        });
     }
 
     fn on_jobs_updated(&mut self, _: Entity<Repository>, _: &JobsUpdated, cx: &mut Context<Self>) {
@@ -6410,6 +6467,28 @@ impl RepositorySnapshot {
 
     pub fn abs_path_to_repo_path(&self, abs_path: &Path) -> Option<RepoPath> {
         Self::abs_path_to_repo_path_inner(&self.work_directory_abs_path, abs_path, self.path_style)
+    }
+
+    /// Returns this repository's path within `parent` when the repositories have
+    /// the layout used by a modern, absorbed Git submodule.
+    ///
+    /// This deliberately stays conservative: old-form submodules that keep a
+    /// real `.git` directory in their worktree are indistinguishable from an
+    /// ordinary nested repository without consulting the parent's index.
+    pub fn modern_submodule_path_in(&self, parent: &RepositorySnapshot) -> Option<RepoPath> {
+        let is_strictly_nested = self.work_directory_abs_path != parent.work_directory_abs_path
+            && self
+                .work_directory_abs_path
+                .starts_with(parent.work_directory_abs_path.as_ref());
+        let uses_absorbed_git_dir = self.repository_dir_abs_path == self.common_dir_abs_path
+            && self.dot_git_abs_path != self.repository_dir_abs_path
+            && self
+                .repository_dir_abs_path
+                .starts_with(parent.repository_dir_abs_path.join("modules"));
+
+        (is_strictly_nested && uses_absorbed_git_dir)
+            .then(|| parent.abs_path_to_repo_path(&self.work_directory_abs_path))
+            .flatten()
     }
 
     pub fn repo_path_to_abs_path(&self, repo_path: &RepoPath) -> PathBuf {
@@ -11595,6 +11674,11 @@ impl Repository {
     pub fn set_branch_list_for_test(&mut self, branches: Vec<Branch>, cx: &mut Context<Self>) {
         self.snapshot.branch_list = branches.into();
         cx.emit(RepositoryEvent::BranchListChanged);
+    }
+
+    pub fn set_branch_for_test(&mut self, branch: Option<Branch>, cx: &mut Context<Self>) {
+        self.snapshot.branch = branch;
+        cx.emit(RepositoryEvent::HeadChanged);
     }
 
     pub fn loaded_commit_data_for_test(&self) -> HashMap<Oid, CommitData> {

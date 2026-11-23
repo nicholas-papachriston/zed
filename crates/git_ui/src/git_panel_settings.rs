@@ -3,8 +3,9 @@ use gpui::Pixels;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{
-    FolderIndicator, GitPanelClickBehavior, GitPanelCommitEditor, GitPanelGroupBy, GitPanelSortBy,
-    IntoGpui, RegisterSetting, Settings, StatusStyle,
+    FolderIndicator, GitPanelAllRepositoriesFilter, GitPanelAllRepositoriesGrouping,
+    GitPanelClickBehavior, GitPanelCommitEditor, GitPanelGroupBy, GitPanelSortBy, IntoGpui,
+    RegisterSetting, Settings, StatusStyle,
 };
 use ui::scrollbars::{ScrollbarVisibility, ShowScrollbar};
 use workspace::dock::DockPosition;
@@ -29,6 +30,9 @@ pub struct GitPanelSettings {
     pub group_by: GitPanelGroupBy,
     pub collapse_untracked_diff: bool,
     pub tree_view: bool,
+    pub show_all_repositories: bool,
+    pub all_repositories_filter: GitPanelAllRepositoriesFilter,
+    pub all_repositories_grouping: GitPanelAllRepositoriesGrouping,
     pub diff_stats: bool,
     pub show_count_badge: bool,
     pub starts_open: bool,
@@ -80,6 +84,9 @@ impl Settings for GitPanelSettings {
             group_by: git_panel.group_by.unwrap(),
             collapse_untracked_diff: git_panel.collapse_untracked_diff.unwrap(),
             tree_view: git_panel.tree_view.unwrap(),
+            show_all_repositories: git_panel.show_all_repositories.unwrap(),
+            all_repositories_filter: git_panel.all_repositories_filter.unwrap(),
+            all_repositories_grouping: git_panel.all_repositories_grouping.unwrap(),
             diff_stats: git_panel.diff_stats.unwrap(),
             show_count_badge: git_panel.show_count_badge.unwrap(),
             starts_open: git_panel.starts_open.unwrap(),
