@@ -365,7 +365,6 @@ fn register_language_model_providers(
 mod tests {
     use super::*;
     use anyhow::Result;
-    use clock::FakeSystemClock;
     use feature_flags::FeatureFlagAppExt as _;
     use gpui::{AppContext as _, AsyncApp, BorrowAppContext as _};
     use http_client::FakeHttpClient;
@@ -414,11 +413,7 @@ mod tests {
         gpui_tokio::init(cx);
         cx.update_flags(false, Vec::new());
 
-        let client = Client::new(
-            Arc::new(FakeSystemClock::new()),
-            FakeHttpClient::with_404_response(),
-            cx,
-        );
+        let client = Client::new(FakeHttpClient::with_404_response(), cx);
         (client, Arc::new(FakeCredentialsProvider))
     }
 

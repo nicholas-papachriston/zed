@@ -1075,7 +1075,6 @@ impl EditPredictionUsage {
 mod tests {
     use super::*;
     use crate::test::make_get_authenticated_user_response;
-    use clock::FakeSystemClock;
     use gpui::TestAppContext;
     use http_client::FakeHttpClient;
     use settings::SettingsStore;
@@ -1088,13 +1087,7 @@ mod tests {
             let settings_store = SettingsStore::test(cx);
             cx.set_global(settings_store);
         });
-        let client = cx.update(|cx| {
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
+        let client = cx.update(|cx| Client::new(FakeHttpClient::with_404_response(), cx));
         let user_store = cx.new(|cx| UserStore::new(client, cx));
 
         let organization = |id: &str, is_personal| Organization {
@@ -1149,13 +1142,7 @@ mod tests {
             let settings_store = SettingsStore::test(cx);
             cx.set_global(settings_store);
         });
-        let client = cx.update(|cx| {
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
+        let client = cx.update(|cx| Client::new(FakeHttpClient::with_404_response(), cx));
         let user_store = cx.new(|cx| UserStore::new(client, cx));
         let organization_changes = Rc::new(Cell::new(0));
         let _subscription = cx.update(|cx| {

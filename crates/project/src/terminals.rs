@@ -855,11 +855,7 @@ mod tests {
         let project = cx.update(|cx| {
             let settings_store = settings::SettingsStore::test(cx);
             cx.set_global(settings_store);
-            let client = client::Client::new(
-                Arc::new(clock::FakeSystemClock::new()),
-                http_client::FakeHttpClient::with_404_response(),
-                cx,
-            );
+            let client = client::Client::new(http_client::FakeHttpClient::with_404_response(), cx);
             let user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
             Project::remote(
                 remote_client,

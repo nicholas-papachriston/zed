@@ -1,45 +1,37 @@
-//! See [Telemetry in Zed](https://zed.dev/docs/telemetry) for additional information.
-use futures::channel::mpsc;
-pub use serde_json;
-use std::sync::OnceLock;
-pub use telemetry_events::FlexibleEvent as Event;
+//! A no-op telemetry sink.
+//!
+//! This build never sends or records telemetry. The [`event!`] macro and
+//! [`send_event`] keep their signatures so call sites compile, but every
+//! event is dropped where it is created.
+use std::collections::HashMap;
 
-/// Macro to create telemetry events and send them to the telemetry queue.
+/// A named event with free-form properties. Built only to be dropped.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Event {
+    pub event_type: String,
+    pub event_properties: HashMap<String, serde_json::Value>,
+}
+
+/// Accepts a telemetry event and drops it.
 ///
-/// By convention, the name should be "Noun Verbed", e.g. "Keymap Changed"
-/// or "Project Diagnostics Opened".
-///
-/// The properties can be any value that implements serde::Serialize.
+/// The macro still evaluates each property expression, so call sites keep
+/// their side effects and do not warn about unused values.
 ///
 /// ```
 /// # let url = "https://example.com";
 /// telemetry::event!("Keymap Changed", version = "1.0.0");
 /// telemetry::event!("Documentation Viewed", url, source = "Extension Upsell");
 /// ```
-///
-/// If you want to debug logging in development, export `RUST_LOG=telemetry=trace`
 #[macro_export]
 macro_rules! event {
     ($name:expr) => {{
-        let event = $crate::Event {
-            event_type: $name.to_string(),
-            event_properties: std::collections::HashMap::new(),
-        };
-        $crate::send_event(event);
+        let _ = &$name;
     }};
     ($name:expr, $($key:ident $(= $value:expr)?),+ $(,)?) => {{
-        let event = $crate::Event {
-            event_type: $name.to_string(),
-            event_properties: std::collections::HashMap::from([
-                $(
-                    (stringify!($key).to_string(),
-                        $crate::serde_json::value::to_value(&$crate::serialize_property!($key $(= $value)?))
-                            .unwrap_or_else(|_| $crate::serde_json::to_value(&()).unwrap())
-                    ),
-                )+
-            ]),
-        };
-        $crate::send_event(event);
+        let _ = &$name;
+        $(
+            let _ = &$crate::serialize_property!($key $(= $value)?);
+        )+
     }};
 }
 
@@ -53,14 +45,24 @@ macro_rules! serialize_property {
     };
 }
 
+/// Drops the event. Telemetry is never sent or written.
 pub fn send_event(event: Event) {
-    if let Some(queue) = TELEMETRY_QUEUE.get() {
-        queue.unbounded_send(event).ok();
+    drop(event);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    #[test]
+    fn event_evaluates_each_property_once() {
+        let calls = Cell::new(0);
+        let next = || {
+            calls.set(calls.get() + 1);
+            calls.get()
+        };
+        let path = "a.rs";
+        crate::event!("Test Event", path, first = next(), second = next());
+        assert_eq!(calls.get(), 2);
     }
 }
-
-pub fn init(tx: mpsc::UnboundedSender<Event>) {
-    TELEMETRY_QUEUE.set(tx).ok();
-}
-
-static TELEMETRY_QUEUE: OnceLock<mpsc::UnboundedSender<Event>> = OnceLock::new();

@@ -114,7 +114,6 @@ gpui_platform = { workspace = true, features = [
     "x11",
 ] }
 gpui_tokio.workspace = true
-hang_telemetry.workspace = true
 image = { workspace = true, optional = true }
 itertools.workspace = true
 rayon.workspace = true
@@ -187,7 +186,6 @@ sysinfo.workspace = true
 tab_switcher.workspace = true
 tasks_ui.workspace = true
 telemetry.workspace = true
-telemetry_events.workspace = true
 terminal_view.workspace = true
 theme.workspace = true
 theme_extension.workspace = true

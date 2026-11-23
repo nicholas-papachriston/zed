@@ -676,7 +676,6 @@ impl Render for ConfigurationView {
 mod tests {
     use super::*;
     use client::{Credentials, test::make_get_authenticated_user_response};
-    use clock::FakeSystemClock;
     use feature_flags::FeatureFlagAppExt as _;
     use gpui::TestAppContext;
     use http_client::{FakeHttpClient, Method, Response};
@@ -696,11 +695,7 @@ mod tests {
         gpui_tokio::init(cx);
         cx.update_flags(false, Vec::new());
 
-        let client = Client::new(
-            Arc::new(FakeSystemClock::new()),
-            FakeHttpClient::with_404_response(),
-            cx,
-        );
+        let client = Client::new(FakeHttpClient::with_404_response(), cx);
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         RefreshLlmTokenListener::register(client.clone(), user_store.clone(), cx);
         let provider = CloudLanguageModelProvider::new(user_store.clone(), client.clone(), cx);

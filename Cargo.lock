@@ -2610,7 +2610,6 @@ dependencies = [
  "async-channel 2.5.0",
  "async-tungstenite",
  "chrono",
- "clock",
  "cloud_api_client",
  "cloud_api_types",
  "cloud_llm_client",
@@ -2618,7 +2617,6 @@ dependencies = [
  "credentials_provider",
  "derive_more",
  "feature_flags",
- "fs",
  "futures",
  "gpui",
  "gpui_tokio",
@@ -2627,11 +2625,9 @@ dependencies = [
  "log",
  "objc2-foundation 0.3.2",
  "parking_lot",
- "paths",
  "postage",
  "proxy_handshake",
  "rand 0.9.4",
- "regex",
  "release_channel",
  "rpc",
  "rustls-pki-types",
@@ -2640,10 +2636,8 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "settings",
- "sha2",
  "smol",
  "telemetry",
- "telemetry_events",
  "text",
  "thiserror 2.0.21",
  "time",
@@ -2654,7 +2648,6 @@ dependencies = [
  "url",
  "util",
  "windows 0.62.2",
- "worktree",
  "zed_credentials_provider",
 ]
 
@@ -6556,17 +6549,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hang_telemetry"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "log",
- "serde",
- "serde_json",
- "telemetry_events",
-]
-
-[[package]]
 name = "harfrust"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8130,7 +8112,6 @@ dependencies = [
  "base64 0.22.1",
  "bedrock",
  "client",
- "clock",
  "cloud_api_client",
  "cloud_api_types",
  "cloud_llm_client",
@@ -13274,7 +13255,6 @@ dependencies = [
  "async-channel 2.5.0",
  "clap",
  "client",
- "clock",
  "collections",
  "crashes",
  "editor",
@@ -15598,17 +15578,6 @@ dependencies = [
 name = "telemetry"
 version = "0.1.0"
 dependencies = [
- "futures",
- "serde_json",
- "telemetry_events",
-]
-
-[[package]]
-name = "telemetry_events"
-version = "0.1.0"
-dependencies = [
- "semver",
- "serde",
  "serde_json",
 ]
 
@@ -19391,7 +19360,6 @@ dependencies = [
  "async-recursion",
  "chrono",
  "client",
- "clock",
  "collections",
  "component",
  "db",
@@ -19942,7 +19910,6 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "gpui_tokio",
- "hang_telemetry",
  "http_client",
  "image",
  "image_viewer",
@@ -20017,7 +19984,6 @@ dependencies = [
  "tabular_data_preview",
  "tasks_ui",
  "telemetry",
- "telemetry_events",
  "tempfile",
  "terminal_view",
  "theme",

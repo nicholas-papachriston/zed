@@ -70,7 +70,6 @@ x_ai_subscribed.workspace = true
 
 [dev-dependencies]
 client = { workspace = true, features = ["test-support"] }
-clock = { workspace = true, features = ["test-support"] }
 cloud_llm_client.workspace = true
 credentials_provider = { workspace = true, features = ["test-support"] }
 db = { workspace = true, features = ["test-support"] }

@@ -2133,13 +2133,10 @@ impl Project {
         root_paths: impl IntoIterator<Item = &Path>,
         cx: &mut AsyncApp,
     ) -> Entity<Project> {
-        use clock::FakeSystemClock;
-
         let fs = RealFs::new(None, cx.background_executor().clone());
         let languages = LanguageRegistry::test(cx.background_executor().clone());
-        let clock = Arc::new(FakeSystemClock::new());
         let http_client = http_client::FakeHttpClient::with_404_response();
-        let client = cx.update(|cx| client::Client::new(clock, http_client.clone(), cx));
+        let client = cx.update(|cx| client::Client::new(http_client.clone(), cx));
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         let project = cx.update(|cx| {
             Project::local(
@@ -2194,12 +2191,9 @@ impl Project {
         init_worktree_trust: bool,
         cx: &mut gpui::TestAppContext,
     ) -> Entity<Project> {
-        use clock::FakeSystemClock;
-
         let languages = LanguageRegistry::test(cx.executor());
-        let clock = Arc::new(FakeSystemClock::new());
         let http_client = http_client::FakeHttpClient::with_404_response();
-        let client = cx.update(|cx| client::Client::new(clock, http_client.clone(), cx));
+        let client = cx.update(|cx| client::Client::new(http_client.clone(), cx));
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         let project = cx.update(|cx| {
             Project::local(
@@ -4071,9 +4065,6 @@ impl Project {
             WorktreeStoreEvent::WorktreeOrderChanged => cx.emit(Event::WorktreeOrderChanged),
             WorktreeStoreEvent::WorktreeUpdateSent(_) => {}
             WorktreeStoreEvent::WorktreeUpdatedEntries(worktree_id, changes) => {
-                self.client()
-                    .telemetry()
-                    .report_discovered_project_type_events(*worktree_id, changes);
                 cx.emit(Event::WorktreeUpdatedEntries(*worktree_id, changes.clone()))
             }
             WorktreeStoreEvent::WorktreeDeletedEntry(worktree_id, id) => {
@@ -5842,39 +5833,13 @@ impl Project {
         Ok(())
     }
 
+    /// Remote servers built from upstream still forward telemetry events.
+    /// This build drops them.
     async fn handle_telemetry_event(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::TelemetryEvent>,
-        mut cx: AsyncApp,
+        _: Entity<Self>,
+        _: TypedEnvelope<proto::TelemetryEvent>,
+        _: AsyncApp,
     ) -> Result<()> {
-        let payload = envelope.payload;
-        this.update(&mut cx, |this, cx| {
-            // The remote connection type, OS, version, and architecture are all
-            // already known from connection setup, so they don't need to be sent
-            // with each event.
-            let Some((connection_type, platform, os_version)) =
-                this.remote_client.as_ref().map(|client| {
-                    let client = client.read(cx);
-                    (
-                        client.connection_type(),
-                        client.remote_platform(),
-                        client.remote_os_version(),
-                    )
-                })
-            else {
-                return;
-            };
-            this.client()
-                .telemetry()
-                .report_remote_event(
-                    &payload.event_json,
-                    connection_type,
-                    platform.os.display_name().to_string(),
-                    os_version,
-                    platform.arch.as_str().to_string(),
-                )
-                .log_err();
-        });
         Ok(())
     }
 

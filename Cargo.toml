@@ -87,7 +87,6 @@ members = [
     "crates/gpui_wgpu",
     "crates/gpui_windows",
     "crates/grammars",
-    "crates/hang_telemetry",
     "crates/html_to_markdown",
     "crates/http_client",
     "crates/http_client_tls",
@@ -192,7 +191,6 @@ members = [
     "crates/task",
     "crates/tasks_ui",
     "crates/telemetry",
-    "crates/telemetry_events",
     "crates/terminal",
     "crates/terminal_view",
     "crates/text",
@@ -339,7 +337,6 @@ gpui_web = { path = "crates/gpui_web", default-features = false }
 gpui_wgpu = { path = "crates/gpui_wgpu" }
 gpui_windows = { path = "crates/gpui_windows", default-features = false }
 grammars = { path = "crates/grammars" }
-hang_telemetry = { path = "crates/hang_telemetry" }
 html_to_markdown = { path = "crates/html_to_markdown" }
 http_client = { path = "crates/http_client" }
 http_client_tls = { path = "crates/http_client_tls" }
@@ -443,7 +440,6 @@ tabular_data_preview = { path = "crates/tabular_data_preview"}
 task = { path = "crates/task" }
 tasks_ui = { path = "crates/tasks_ui" }
 telemetry = { path = "crates/telemetry" }
-telemetry_events = { path = "crates/telemetry_events" }
 terminal = { path = "crates/terminal" }
 terminal_view = { path = "crates/terminal_view" }
 text = { path = "crates/text" }
@@ -1091,7 +1087,6 @@ session = { codegen-units = 1 }
 sidebar = { codegen-units = 1 }
 snippet = { codegen-units = 1 }
 snippets_ui = { codegen-units = 1 }
-telemetry_events = { codegen-units = 1 }
 theme_selector = { codegen-units = 1 }
 time_format = { codegen-units = 1 }
 ui_input = { codegen-units = 1 }
