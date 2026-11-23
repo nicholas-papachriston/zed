@@ -45,11 +45,7 @@ members = [
     "crates/crashes",
     "crates/credentials_provider",
     "crates/dap",
-    "crates/dap_adapters",
     "crates/db",
-    "crates/debug_adapter_extension",
-    "crates/debugger_tools",
-    "crates/debugger_ui",
     "crates/deepseek",
     "crates/dev_container",
     "crates/diagnostics",
@@ -325,11 +321,7 @@ crashes = { path = "crates/crashes" }
 crates_io_client = { path = "tooling/crates_io_client" }
 credentials_provider = { path = "crates/credentials_provider" }
 dap = { path = "crates/dap" }
-dap_adapters = { path = "crates/dap_adapters" }
 db = { path = "crates/db" }
-debug_adapter_extension = { path = "crates/debug_adapter_extension" }
-debugger_tools = { path = "crates/debugger_tools" }
-debugger_ui = { path = "crates/debugger_ui" }
 deepseek = { path = "crates/deepseek" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
 dev_container = { path = "crates/dev_container" }

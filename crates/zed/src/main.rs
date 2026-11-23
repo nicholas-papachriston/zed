@@ -569,7 +569,6 @@ fn main() {
 
         let node_runtime = NodeRuntime::new(client.http_client(), Some(shell_env_loaded_rx), rx);
 
-        debug_adapter_extension::init(extension_host_proxy.clone(), cx);
         languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
@@ -599,8 +598,6 @@ fn main() {
         #[cfg(target_os = "macos")]
         zed::move_to_applications::init(cx);
         project::Project::init(&client, cx);
-        debugger_ui::init(cx);
-        debugger_tools::init(cx);
         client::init(&client, cx);
         feature_flags::FeatureFlagStore::init(cx);
 
@@ -666,7 +663,6 @@ fn main() {
         AppState::set_global(app_state.clone(), cx);
 
         watcher_debug::init(app_state.clone(), cx);
-        dap_adapters::init(cx);
         reliability::init(client.clone(), app_state.workspace_store.clone(), cx);
         extension_host::init(
             extension_host_proxy.clone(),

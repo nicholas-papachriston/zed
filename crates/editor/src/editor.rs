@@ -4517,8 +4517,6 @@ impl Editor {
                 )
             });
 
-        let run_to_cursor = window.is_action_available(&RunToCursor, cx);
-
         let toggle_state_entry: Option<(&str, Box<dyn Action>)> =
             breakpoint.as_ref().map(|bp| match bp.1.state {
                 BreakpointState::Enabled => {
@@ -4551,32 +4549,6 @@ impl Editor {
                         .separator()
                     },
                 )
-                .when(run_to_cursor, |this| {
-                    let weak_editor = weak_editor.clone();
-                    this.entry(
-                        "Run to Cursor",
-                        Some(RunToCursor.boxed_clone()),
-                        move |window, cx| {
-                            weak_editor
-                                .update(cx, |editor, cx| {
-                                    editor.change_selections(
-                                        SelectionEffects::no_scroll(),
-                                        window,
-                                        cx,
-                                        |s| {
-                                            s.select_ranges(
-                                                [Point::new(row, 0)..Point::new(row, 0)],
-                                            )
-                                        },
-                                    );
-                                })
-                                .ok();
-
-                            window.dispatch_action(Box::new(RunToCursor), cx);
-                        },
-                    )
-                    .separator()
-                })
                 .when_some(toggle_state_entry, |this, (msg, action)| {
                     this.entry(msg, Some(action), {
                         let weak_editor = weak_editor.clone();
