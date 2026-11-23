@@ -390,8 +390,7 @@ fn main() {
         KeyValueStore::from_app_db(&app_db),
     ));
 
-    let should_install_crash_handler =
-        client::telemetry::should_install_crash_handler(*release_channel::RELEASE_CHANNEL);
+    let should_install_crash_handler = client::telemetry::should_install_crash_handler();
 
     let crash_handler = if should_install_crash_handler {
         Some(

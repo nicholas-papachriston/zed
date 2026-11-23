@@ -161,11 +161,9 @@ project_panel.workspace = true
 project_symbols.workspace = true
 project_bookmarks.workspace = true
 prompt_store.workspace = true
-proto.workspace = true
 recent_projects.workspace = true
 release_channel.workspace = true
 remote.workspace = true
-reqwest = { workspace = true, features = ["multipart"] }
 reqwest_client.workspace = true
 rope.workspace = true
 sandbox.workspace = true

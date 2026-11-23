@@ -1,9 +1,8 @@
 use crate::TelemetrySettings;
 use gpui::App;
 use parking_lot::Mutex;
-use release_channel::ReleaseChannel;
 use settings::{Settings, SettingsStore};
-use std::{env, sync::Arc, sync::LazyLock};
+use std::{env, sync::Arc};
 
 /// Identity and settings state for this client.
 ///
@@ -22,17 +21,15 @@ struct TelemetryState {
     is_staff: Option<bool>,
 }
 
-pub static MINIDUMP_ENDPOINT: LazyLock<Option<String>> = LazyLock::new(|| {
-    option_env!("ZED_MINIDUMP_ENDPOINT")
-        .map(str::to_string)
-        .or_else(|| env::var("ZED_MINIDUMP_ENDPOINT").ok())
-});
+/// Whether to run the crash handler, which writes minidumps to the local
+/// logs directory. This build never uploads them, so the handler runs only
+/// when `ZED_GENERATE_MINIDUMPS` asks for local dumps.
+pub fn should_install_crash_handler() -> bool {
+    generates_minidumps(env::var("ZED_GENERATE_MINIDUMPS").ok().as_deref())
+}
 
-pub fn should_install_crash_handler(channel: ReleaseChannel) -> bool {
-    matches!(
-        env::var("ZED_GENERATE_MINIDUMPS").as_deref(),
-        Ok("true" | "1")
-    ) || (channel != ReleaseChannel::Dev && MINIDUMP_ENDPOINT.is_some())
+fn generates_minidumps(value: Option<&str>) -> bool {
+    matches!(value, Some("true" | "1"))
 }
 
 /// Returns the OS name, including the display server the platform connected to.
@@ -92,7 +89,7 @@ pub fn os_version() -> String {
            "test binary".to_owned()
        }
        target_os = "macos" => {
-           static MACOS_VERSION_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
+           static MACOS_VERSION_REGEX: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
                regex::Regex::new(r"(\s*\(Build [^)]*[0-9]\))").unwrap()
            });
            use objc2_foundation::NSProcessInfo;
@@ -204,5 +201,19 @@ impl Telemetry {
 
     pub fn is_staff(self: &Arc<Self>) -> Option<bool> {
         self.state.lock().is_staff
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generates_minidumps;
+
+    #[test]
+    fn crash_handler_runs_only_when_local_minidumps_are_requested() {
+        assert!(generates_minidumps(Some("1")));
+        assert!(generates_minidumps(Some("true")));
+        assert!(!generates_minidumps(None));
+        assert!(!generates_minidumps(Some("0")));
+        assert!(!generates_minidumps(Some("yes")));
     }
 }
