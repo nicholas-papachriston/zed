@@ -530,7 +530,6 @@ impl Editor {
             this.trigger_completion_on_input(&text, trigger_in_words, window, cx);
             refresh_linked_ranges(this, window, cx);
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -781,7 +780,6 @@ impl Editor {
 
             this.change_selections(Default::default(), window, cx, |s| s.select(new_selections));
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,

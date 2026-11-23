@@ -18,9 +18,6 @@ pub enum EditPredictionRequestTrigger {
     PredictionAccepted,
     PredictionPartiallyAccepted,
     EditorCreated,
-    ProviderChanged,
-    UserInfoChanged,
-    VimModeChanged,
     SettingsChanged,
     #[default]
     Other,

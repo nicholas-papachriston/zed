@@ -167,29 +167,7 @@ impl Editor {
             provider: Arc::new(provider),
         });
         self.update_edit_prediction_settings(cx);
-        self.refresh_edit_prediction(false, false, trigger, window, cx);
-    }
-
-    pub fn set_edit_predictions_hidden_for_vim_mode(
-        &mut self,
-        hidden: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if hidden != self.edit_predictions_hidden_for_vim_mode {
-            self.edit_predictions_hidden_for_vim_mode = hidden;
-            if hidden {
-                self.update_visible_edit_prediction(window, cx);
-            } else {
-                self.refresh_edit_prediction(
-                    true,
-                    false,
-                    EditPredictionRequestTrigger::VimModeChanged,
-                    window,
-                    cx,
-                );
-            }
-        }
+        self.refresh_edit_prediction(false, trigger, window, cx);
     }
 
     pub fn toggle_edit_predictions(
@@ -218,19 +196,12 @@ impl Editor {
         if let Some(false) = show_edit_predictions {
             self.discard_edit_prediction(EditPredictionDiscardReason::Ignored, cx);
         } else {
-            self.refresh_edit_prediction(
-                false,
-                true,
-                EditPredictionRequestTrigger::Explicit,
-                window,
-                cx,
-            );
+            self.refresh_edit_prediction(true, EditPredictionRequestTrigger::Explicit, window, cx);
         }
     }
 
     pub fn refresh_edit_prediction(
         &mut self,
-        debounce: bool,
         user_requested: bool,
         trigger: EditPredictionRequestTrigger,
         window: &mut Window,
@@ -265,20 +236,10 @@ impl Editor {
             return None;
         }
 
-        let debounce_duration = if debounce {
-            let registered_provider = self.edit_prediction_provider.as_ref()?;
-            let settings = all_language_settings(None, cx);
-            settings
-                .edit_predictions
-                .debounce_for_delegate(registered_provider.provider.name())
-        } else {
-            Duration::ZERO
-        };
-
         self.edit_prediction_provider()?.refresh(
             buffer,
             cursor_buffer_position,
-            debounce_duration,
+            Duration::ZERO,
             trigger,
             cx,
         );
@@ -340,13 +301,7 @@ impl Editor {
         cx: &mut Context<Self>,
     ) {
         if !self.has_active_edit_prediction() {
-            self.refresh_edit_prediction(
-                false,
-                true,
-                EditPredictionRequestTrigger::Explicit,
-                window,
-                cx,
-            );
+            self.refresh_edit_prediction(true, EditPredictionRequestTrigger::Explicit, window, cx);
             return;
         }
 
@@ -497,7 +452,6 @@ impl Editor {
                         if self.active_edit_prediction.is_none() {
                             self.refresh_edit_prediction(
                                 true,
-                                true,
                                 EditPredictionRequestTrigger::PredictionAccepted,
                                 window,
                                 cx,
@@ -555,7 +509,6 @@ impl Editor {
 
                             self.replace_selections(&text_to_insert, None, window, cx, false);
                             self.refresh_edit_prediction(
-                                true,
                                 true,
                                 EditPredictionRequestTrigger::PredictionPartiallyAccepted,
                                 window,
@@ -966,8 +919,7 @@ impl Editor {
             .map(|provider| provider.provider.supports_jump_to_edit())
             .unwrap_or(true);
 
-        let is_move = supports_jump
-            && (move_invalidation_row_range.is_some() || self.edit_predictions_hidden_for_vim_mode);
+        let is_move = supports_jump && move_invalidation_row_range.is_some();
         let completion = if is_move {
             if let Some(provider) = &self.edit_prediction_provider {
                 provider.provider.did_show(SuggestionDisplayType::Jump, cx);
@@ -983,8 +935,7 @@ impl Editor {
             }
         } else {
             let show_completions_in_menu = self.has_visible_completions_menu();
-            let show_completions_in_buffer = !self.edit_prediction_visible_in_cursor_popover(true)
-                && !self.edit_predictions_hidden_for_vim_mode;
+            let show_completions_in_buffer = !self.edit_prediction_visible_in_cursor_popover(true);
 
             let display_mode = if all_edits_insertions_or_deletions(&edits, &multibuffer) {
                 if provider.show_tab_accept_marker() {

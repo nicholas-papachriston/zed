@@ -1973,10 +1973,6 @@
   //      "load_direnv": "disabled"
   "load_direnv": "direct",
   "edit_predictions": {
-    // Whether to show the edit prediction button in the status bar.
-    "button": true,
-    // Which edit prediction provider to use.
-    "provider": "zed",
     // Disable edit predictions for files matching these glob patterns.
     //
     // Use `"..."` to add patterns without repeating Zed's defaults. In project
@@ -2010,55 +2006,6 @@
     // 2. Display predictions inline only when holding a modifier key (alt by default).
     //     "mode": "subtle"
     "mode": "eager",
-    // Copilot-specific settings
-    // "copilot": {
-    //   "proxy": "",
-    //   "proxy_no_verify": false,
-    //   "enable_next_edit_suggestions": true,
-    //   // The debounce delay in milliseconds before automatically requesting a prediction.
-    //   // Set to 0 to request predictions immediately.
-    //   "prediction_debounce": 75
-    // },
-    "copilot": {
-      "proxy": null,
-      "proxy_no_verify": null,
-      "enable_next_edit_suggestions": true,
-      "prediction_debounce": 75,
-    },
-    "codestral": {
-      "api_url": "https://codestral.mistral.ai",
-      "model": "codestral-latest",
-      "max_tokens": 150,
-      "prediction_debounce": 150,
-    },
-    "ollama": {
-      "api_url": "http://localhost:11434",
-      "model": "qwen2.5-coder:7b-base",
-      "prompt_format": "infer",
-      "max_output_tokens": 64,
-      "prediction_debounce": 0,
-    },
-    "open_ai_compatible_api": {
-      "api_url": "",
-      "model": "",
-      "prompt_format": "infer",
-      "max_output_tokens": 64,
-      "prediction_debounce": 0,
-    },
-    "zed": {
-      "prediction_debounce": 0,
-    },
-    "mercury": {
-      "prediction_debounce": 0,
-    },
-    // Controls whether Zed may collect training data when using Zed's Edit Predictions.
-    // Data is only captured when the project is detected as open source.
-    // Possible values:
-    //   - "default": use the preference previously set via the status-bar toggle,
-    //     or false if no preference has been stored.
-    //   - "yes": allow data collection for files in open-source projects.
-    //   - "no": never allow data collection.
-    "allow_data_collection": "default",
   },
   // Status bar-related settings.
   "status_bar": {
@@ -2709,10 +2656,6 @@
       "format_on_save": "on",
       "language_servers": ["zls", "..."],
     },
-  },
-  // Settings shared by Copilot Chat and edit predictions.
-  "copilot": {
-    "enterprise_uri": null,
   },
   // Different settings for specific language models.
   "language_models": {

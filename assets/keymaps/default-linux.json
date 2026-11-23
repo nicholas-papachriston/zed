@@ -33,8 +33,6 @@
       "ctrl-0": ["zed::ResetBufferFontSize", { "persist": false }],
       "ctrl-alt-,": "zed::OpenSettingsFile",
       "ctrl-q": "zed::Quit",
-      "ctrl-alt-z": "edit_prediction::RatePredictions",
-      "ctrl-alt-shift-i": "edit_prediction::ToggleMenu",
       "ctrl-alt-l": "lsp_tool::ToggleMenu",
       "ctrl-alt-shift-s": "workspace::ToggleWorktreeSecurity",
     },
@@ -1287,12 +1285,6 @@
     },
   },
   {
-    "context": "ZedPredictModal",
-    "bindings": {
-      "escape": "menu::Cancel",
-    },
-  },
-  {
     "context": "ConfigureContextServerModal > Editor",
     "bindings": {
       "escape": "menu::Cancel",
@@ -1485,13 +1477,6 @@
       "pagedown": "settings_editor::FocusNextRootNavEntry",
       "home": "settings_editor::FocusFirstNavEntry",
       "end": "settings_editor::FocusLastNavEntry",
-    },
-  },
-  {
-    "context": "EditPredictionContext > Editor",
-    "bindings": {
-      "alt-left": "dev::EditPredictionContextGoBack",
-      "alt-right": "dev::EditPredictionContextGoForward",
     },
   },
   {

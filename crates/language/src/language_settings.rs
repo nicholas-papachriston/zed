@@ -13,18 +13,17 @@ use ec4rs::{
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use gpui::{App, Modifiers, SharedString};
 use itertools::Itertools;
-use settings::{DelayMs, DocumentFoldingRanges, DocumentSymbols, IntoGpui, SemanticTokens};
+use settings::{DocumentFoldingRanges, DocumentSymbols, IntoGpui, SemanticTokens};
 
 pub use settings::{
-    AutoIndentMode, CompletionSettingsContent, ConfiguredLanguageServer,
-    EditPredictionDataCollectionChoice, EditPredictionPromptFormatContent, EditPredictionProvider,
-    EditPredictionsMode, FormatOnSave, Formatter, FormatterList, InlayHintKind,
-    LanguageSettingsContent, LineEndingSetting, LspInsertMode, REST_OF_LANGUAGE_SERVERS,
-    RewrapBehavior, ShowWhitespaceSetting, SoftWrap, SoftWrapIndent, WordsCompletionMode,
+    AutoIndentMode, CompletionSettingsContent, ConfiguredLanguageServer, EditPredictionsMode,
+    FormatOnSave, Formatter, FormatterList, InlayHintKind, LanguageSettingsContent,
+    LineEndingSetting, LspInsertMode, REST_OF_LANGUAGE_SERVERS, RewrapBehavior,
+    ShowWhitespaceSetting, SoftWrap, SoftWrapIndent, WordsCompletionMode,
 };
 use settings::{RegisterSetting, Settings, SettingsLocation, SettingsStore, merge_from::MergeFrom};
 use shellexpand;
-use std::{num::NonZeroU32, path::Path, sync::Arc, time::Duration};
+use std::{num::NonZeroU32, path::Path, sync::Arc};
 use text::ToOffset;
 
 /// Returns the settings for all languages from the provided file.
@@ -494,13 +493,9 @@ impl InlayHintSettings {
     }
 }
 
-/// The settings for edit predictions, such as [GitHub Copilot](https://github.com/features/copilot).
+/// The settings for edit predictions.
 #[derive(Clone, Debug, Default)]
 pub struct EditPredictionSettings {
-    /// Whether to show the edit prediction button in the status bar.
-    pub button: bool,
-    /// The provider that supplies edit predictions.
-    pub provider: settings::EditPredictionProvider,
     /// Disable edit predictions for files matching these glob patterns.
     ///
     /// Use `"..."` to add patterns without repeating Zed's defaults. In project
@@ -526,23 +521,6 @@ pub struct EditPredictionSettings {
     pub disabled_globs: Vec<DisabledGlob>,
     /// Configures how edit predictions are displayed in the buffer.
     pub mode: settings::EditPredictionsMode,
-    /// Settings specific to GitHub Copilot.
-    pub copilot: CopilotEditPredictionSettings,
-    /// Settings specific to Codestral.
-    pub codestral: CodestralSettings,
-    /// Settings specific to Ollama.
-    pub ollama: Option<OpenAiCompatibleEditPredictionSettings>,
-    /// Settings specific to using custom OpenAI-compatible servers for edit prediction.
-    pub open_ai_compatible_api: Option<OpenAiCompatibleEditPredictionSettings>,
-    /// Settings specific to Zed's Edit Predictions provider.
-    pub zed: ZedEditPredictionSettings,
-    /// Settings specific to the Mercury Edit Predictions provider.
-    pub mercury: MercuryEditPredictionSettings,
-    /// Controls whether training data collection is enabled.
-    ///
-    /// `Default` means the value stored in the legacy KV store is used as a fallback,
-    /// preserving existing users' choices without a migration.
-    pub allow_data_collection: EditPredictionDataCollectionChoice,
 }
 
 impl EditPredictionSettings {
@@ -557,140 +535,12 @@ impl EditPredictionSettings {
             }
         })
     }
-
-    /// Returns the configured debounce delay for the given provider.
-    pub fn debounce_for(&self, provider: settings::EditPredictionProvider) -> Duration {
-        let delay = match provider {
-            settings::EditPredictionProvider::Copilot => self.copilot.prediction_debounce,
-            settings::EditPredictionProvider::Codestral => self.codestral.prediction_debounce,
-            settings::EditPredictionProvider::Ollama => self
-                .ollama
-                .as_ref()
-                .map_or_else(DelayMs::default, |settings| settings.prediction_debounce),
-            settings::EditPredictionProvider::OpenAiCompatibleApi => self
-                .open_ai_compatible_api
-                .as_ref()
-                .map_or_else(DelayMs::default, |settings| settings.prediction_debounce),
-            settings::EditPredictionProvider::Zed => self.zed.prediction_debounce,
-            settings::EditPredictionProvider::Mercury => self.mercury.prediction_debounce,
-            settings::EditPredictionProvider::None => DelayMs::default(),
-        };
-        Duration::from_millis(delay.0)
-    }
-
-    /// Returns the configured debounce delay for the active prediction delegate.
-    ///
-    /// The Zed edit-prediction delegate handles multiple settings providers
-    /// (Zed, Mercury, Ollama, OpenAI-compatible), so it is identified by name
-    /// and then uses the currently configured provider to resolve the delay.
-    pub fn debounce_for_delegate(&self, delegate_name: &str) -> Duration {
-        match delegate_name {
-            "copilot" => Duration::from_millis(self.copilot.prediction_debounce.0),
-            "codestral" => Duration::from_millis(self.codestral.prediction_debounce.0),
-            "zed-predict" => self.debounce_for(self.provider),
-            _ => Duration::ZERO,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct DisabledGlob {
     matcher: GlobMatcher,
     is_absolute: bool,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct CopilotEditPredictionSettings {
-    /// HTTP/HTTPS proxy to use for Copilot.
-    pub proxy: Option<String>,
-    /// Disable certificate verification for proxy (not recommended).
-    pub proxy_no_verify: Option<bool>,
-    /// Whether the Copilot Next Edit Suggestions feature is enabled.
-    pub enable_next_edit_suggestions: Option<bool>,
-    /// Automatic prediction debounce delay.
-    pub prediction_debounce: DelayMs,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct CodestralSettings {
-    /// Model to use for completions.
-    pub model: Option<String>,
-    /// Maximum tokens to generate.
-    pub max_tokens: Option<u32>,
-    /// Custom API URL to use for Codestral.
-    pub api_url: Option<String>,
-    /// Automatic prediction debounce delay.
-    pub prediction_debounce: DelayMs,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct ZedEditPredictionSettings {
-    /// Automatic prediction debounce delay.
-    pub prediction_debounce: DelayMs,
-}
-
-/// Settings specific to the Mercury Edit Predictions provider.
-#[derive(Clone, Debug, Default)]
-pub struct MercuryEditPredictionSettings {
-    /// Automatic prediction debounce delay.
-    pub prediction_debounce: DelayMs,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct OpenAiCompatibleEditPredictionSettings {
-    /// Model to use for completions.
-    pub model: String,
-    /// Maximum tokens to generate.
-    pub max_output_tokens: u32,
-    /// Custom API URL to use for Ollama.
-    pub api_url: Arc<str>,
-    /// The prompt format to use for completions. When `None`, the format
-    /// will be derived from the model name at request time.
-    pub prompt_format: EditPredictionPromptFormat,
-    /// Automatic prediction debounce delay.
-    pub prediction_debounce: DelayMs,
-}
-
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub enum EditPredictionPromptFormat {
-    #[default]
-    Infer,
-    Zeta(ZetaVersion),
-    CodeLlama,
-    StarCoder,
-    DeepseekCoder,
-    Qwen,
-    CodeGemma,
-    Codestral,
-    Glm,
-    Sweep,
-}
-
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub enum ZetaVersion {
-    Zeta1,
-    Zeta2,
-    #[default] // NOTE: make latest version default when adding
-    Zeta2_1,
-}
-
-impl From<EditPredictionPromptFormatContent> for EditPredictionPromptFormat {
-    fn from(value: EditPredictionPromptFormatContent) -> Self {
-        match value {
-            EditPredictionPromptFormatContent::Infer => Self::Infer,
-            EditPredictionPromptFormatContent::Zeta => Self::Zeta(ZetaVersion::Zeta1),
-            EditPredictionPromptFormatContent::Zeta2 => Self::Zeta(ZetaVersion::Zeta2),
-            EditPredictionPromptFormatContent::Zeta2_1 => Self::Zeta(ZetaVersion::Zeta2_1),
-            EditPredictionPromptFormatContent::CodeLlama => Self::CodeLlama,
-            EditPredictionPromptFormatContent::StarCoder => Self::StarCoder,
-            EditPredictionPromptFormatContent::DeepseekCoder => Self::DeepseekCoder,
-            EditPredictionPromptFormatContent::Qwen => Self::Qwen,
-            EditPredictionPromptFormatContent::CodeGemma => Self::CodeGemma,
-            EditPredictionPromptFormatContent::Codestral => Self::Codestral,
-            EditPredictionPromptFormatContent::Glm => Self::Glm,
-            EditPredictionPromptFormatContent::Sweep => Self::Sweep,
-        }
-    }
 }
 
 impl AllLanguageSettings {
@@ -938,11 +788,6 @@ impl settings::Settings for AllLanguageSettings {
             );
         }
 
-        let edit_prediction_provider = all_languages
-            .edit_predictions
-            .as_ref()
-            .and_then(|ep| ep.provider);
-
         let edit_predictions = all_languages.edit_predictions.clone().unwrap();
         let edit_predictions_mode = edit_predictions.mode.unwrap();
 
@@ -953,52 +798,6 @@ impl settings::Settings for AllLanguageSettings {
             .0
             .iter()
             .collect();
-
-        let copilot = edit_predictions.copilot.unwrap();
-        let copilot_settings = CopilotEditPredictionSettings {
-            proxy: copilot.proxy,
-            proxy_no_verify: copilot.proxy_no_verify,
-            enable_next_edit_suggestions: copilot.enable_next_edit_suggestions,
-            prediction_debounce: copilot.prediction_debounce.unwrap(),
-        };
-
-        let codestral = edit_predictions.codestral.unwrap();
-        let codestral_settings = CodestralSettings {
-            model: codestral.model,
-            max_tokens: codestral.max_tokens,
-            api_url: codestral.api_url,
-            prediction_debounce: codestral.prediction_debounce.unwrap(),
-        };
-
-        let ollama = edit_predictions.ollama.unwrap();
-        let ollama_settings = ollama
-            .model
-            .filter(|model| !model.0.is_empty())
-            .map(|model| OpenAiCompatibleEditPredictionSettings {
-                model: model.0,
-                max_output_tokens: ollama.max_output_tokens.unwrap(),
-                api_url: ollama.api_url.unwrap().into(),
-                prompt_format: ollama.prompt_format.unwrap().into(),
-                prediction_debounce: ollama.prediction_debounce.unwrap(),
-            });
-        let openai_compatible_settings = edit_predictions.open_ai_compatible_api.unwrap();
-        let openai_compatible_settings = openai_compatible_settings
-            .model
-            .filter(|model| !model.is_empty())
-            .zip(
-                openai_compatible_settings
-                    .api_url
-                    .filter(|api_url| !api_url.is_empty()),
-            )
-            .map(|(model, api_url)| OpenAiCompatibleEditPredictionSettings {
-                model,
-                max_output_tokens: openai_compatible_settings.max_output_tokens.unwrap(),
-                api_url: api_url.into(),
-                prompt_format: openai_compatible_settings.prompt_format.unwrap().into(),
-                prediction_debounce: openai_compatible_settings.prediction_debounce.unwrap(),
-            });
-        let zed_settings = edit_predictions.zed.unwrap();
-        let mercury_settings = edit_predictions.mercury.unwrap();
 
         let mut file_types: FxHashMap<Arc<str>, (GlobSet, Vec<String>)> = FxHashMap::default();
 
@@ -1032,12 +831,6 @@ impl settings::Settings for AllLanguageSettings {
 
         Self {
             edit_predictions: EditPredictionSettings {
-                button: edit_predictions.button.unwrap(),
-                provider: if let Some(provider) = edit_prediction_provider {
-                    provider
-                } else {
-                    EditPredictionProvider::None
-                },
                 disabled_globs: disabled_globs
                     .iter()
                     .filter_map(|g| {
@@ -1049,17 +842,6 @@ impl settings::Settings for AllLanguageSettings {
                     })
                     .collect(),
                 mode: edit_predictions_mode,
-                copilot: copilot_settings,
-                codestral: codestral_settings,
-                ollama: ollama_settings,
-                open_ai_compatible_api: openai_compatible_settings,
-                zed: ZedEditPredictionSettings {
-                    prediction_debounce: zed_settings.prediction_debounce.unwrap(),
-                },
-                mercury: MercuryEditPredictionSettings {
-                    prediction_debounce: mercury_settings.prediction_debounce.unwrap(),
-                },
-                allow_data_collection: edit_predictions.allow_data_collection.unwrap_or_default(),
             },
             defaults: default_language_settings,
             languages,

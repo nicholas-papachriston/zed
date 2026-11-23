@@ -255,7 +255,6 @@ gpui = [
 ]
 git_ui = ["src/commit_message_prompt.txt"]
 editor = ["../grammars/src/**"]
-edit_prediction = ["license_patterns/**"]
 agent_skills = ["builtin/**"]
 agent_settings = ["src/prompts/**"]
 json_schema_store = ["src/schemas/**"]
@@ -272,7 +271,3 @@ prompt_store = ["../git_ui/src/commit_message_prompt.txt"]
 release_channel = ["../zed/RELEASE_CHANNEL"]
 cli = ["../../script/uninstall.sh"]
 remote_server = ["../zed/Cargo.toml"]
-# `../zed/Cargo.toml`: build.rs reads it for ZED_PKG_VERSION. `../grammars/src`
-# and `src/prompts` are embedded in release builds; dev builds read them at
-# runtime via fs_embed.
-edit_prediction_cli = ["../zed/Cargo.toml", "../grammars/src/**", "src/prompts/**"]

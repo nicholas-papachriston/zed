@@ -1012,7 +1012,6 @@ impl Editor {
             }
             linked_edits.apply(cx);
             editor.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::LSPCompletionAccepted,
                 window,

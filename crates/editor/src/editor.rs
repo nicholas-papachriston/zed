@@ -1106,7 +1106,6 @@ pub struct Editor {
     /// Used to prevent flickering as the user types while the menu is open
     stale_edit_prediction_in_menu: Option<EditPredictionState>,
     edit_prediction_settings: EditPredictionSettings,
-    edit_predictions_hidden_for_vim_mode: bool,
     show_edit_predictions_override: Option<bool>,
     show_completions_on_input_override: Option<bool>,
     menu_edit_predictions_policy: MenuEditPredictionsPolicy,
@@ -2512,7 +2511,6 @@ impl Editor {
             hovered_cursors: HashMap::default(),
             next_editor_action_id: EditorActionId::default(),
             editor_actions: Rc::default(),
-            edit_predictions_hidden_for_vim_mode: false,
             show_edit_predictions_override: None,
             show_completions_on_input_override: None,
             menu_edit_predictions_policy: MenuEditPredictionsPolicy::ByProvider,
@@ -5263,7 +5261,6 @@ impl Editor {
             this.insert("", window, cx);
             linked_edits.apply_with_left_expansion(cx);
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -5292,7 +5289,6 @@ impl Editor {
             this.insert("", window, cx);
             linked_edits.apply(cx);
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -5483,7 +5479,6 @@ impl Editor {
             this.buffer.update(cx, |b, cx| b.edit(edits, None, cx));
             this.change_selections(Default::default(), window, cx, |s| s.select(selections));
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -7979,7 +7974,6 @@ impl Editor {
             self.request_autoscroll(Autoscroll::fit(), cx);
             self.unmark_text(window, cx);
             self.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -8008,7 +8002,6 @@ impl Editor {
             self.request_autoscroll(Autoscroll::fit(), cx);
             self.unmark_text(window, cx);
             self.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -9188,7 +9181,6 @@ impl Editor {
                 });
             this.edit(edits, cx);
             this.refresh_edit_prediction(
-                true,
                 false,
                 EditPredictionRequestTrigger::BufferEdit,
                 window,
@@ -10331,7 +10323,6 @@ impl Editor {
         self.refresh_runnables(None, window, cx);
         self.update_edit_prediction_settings(cx);
         self.refresh_edit_prediction(
-            true,
             false,
             EditPredictionRequestTrigger::SettingsChanged,
             window,
@@ -10795,15 +10786,6 @@ impl Editor {
             .and_then(|e| e.to_str())
             .map(|a| a.to_string()));
 
-        let edit_predictions_provider = all_language_settings(file, cx).edit_predictions.provider;
-        let copilot_enabled = edit_predictions_provider
-            == language::language_settings::EditPredictionProvider::Copilot;
-        let copilot_enabled_for_language = self
-            .buffer
-            .read(cx)
-            .language_settings(cx)
-            .show_edit_predictions;
-
         let project = project.read(cx);
         let event_type = reported_event.event_type();
 
@@ -10812,18 +10794,12 @@ impl Editor {
                 event_type,
                 type = if auto_saved {"autosave"} else {"manual"},
                 file_extension,
-                copilot_enabled,
-                copilot_enabled_for_language,
-                edit_predictions_provider,
                 is_via_ssh = project.is_via_remote_server(),
             );
         } else {
             telemetry::event!(
                 event_type,
                 file_extension,
-                copilot_enabled,
-                copilot_enabled_for_language,
-                edit_predictions_provider,
                 is_via_ssh = project.is_via_remote_server(),
             );
         };

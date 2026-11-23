@@ -7,7 +7,6 @@ license = "Apache-2.0"
 
 [features]
 test-support = []
-predict-edits = ["dep:zeta_prompt"]
 
 [lints]
 workspace = true
@@ -22,6 +21,5 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 strum.workspace = true
 uuid.workspace = true
-zeta_prompt = { workspace = true, optional = true }
 
 
