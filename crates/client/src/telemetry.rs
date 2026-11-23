@@ -92,8 +92,8 @@ pub fn os_version() -> String {
            "test binary".to_owned()
        }
        target_os = "macos" => {
-           static MACOS_VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-               Regex::new(r"(\s*\(Build [^)]*[0-9]\))").unwrap()
+           static MACOS_VERSION_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
+               regex::Regex::new(r"(\s*\(Build [^)]*[0-9]\))").unwrap()
            });
            use objc2_foundation::NSProcessInfo;
            let process_info = NSProcessInfo::processInfo();

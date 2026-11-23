@@ -2628,6 +2628,7 @@ dependencies = [
  "postage",
  "proxy_handshake",
  "rand 0.9.4",
+ "regex",
  "release_channel",
  "rpc",
  "rustls-pki-types",

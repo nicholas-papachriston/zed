@@ -34,9 +34,10 @@ http_client.workspace = true
 http_client_tls.workspace = true
 log.workspace = true
 parking_lot.workspace = true
-postage.workspace = true
+postage = { workspace = true, features = ["futures-traits"] }
 proxy_handshake = { workspace = true, features = ["tokio"] }
 rand.workspace = true
+regex.workspace = true
 release_channel.workspace = true
 rpc = { workspace = true, features = ["gpui"] }
 serde.workspace = true
