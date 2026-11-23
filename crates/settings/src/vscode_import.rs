@@ -185,7 +185,6 @@ impl VsCodeSettings {
             agent_servers: None,
             audio: None,
             base_keymap: Some(BaseKeymapContent::VSCode),
-            calls: None,
             collaboration_panel: None,
             command_palette: self
                 .read_u64("workbench.commandPalette.history")
