@@ -16174,13 +16174,6 @@ mod tests {
                 )
                 .expect("failed to load default keymap"),
             );
-            cx.bind_keys(
-                settings::KeymapFile::load_asset_allow_partial_failure(
-                    settings::VIM_KEYMAP_PATH,
-                    cx,
-                )
-                .expect("failed to load Vim keymap"),
-            );
         });
         let fs = FakeFs::new(cx.background_executor.clone());
         fs.insert_tree(

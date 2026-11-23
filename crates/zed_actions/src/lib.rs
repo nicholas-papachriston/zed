@@ -782,18 +782,6 @@ actions!(
     [ShowIncomingCalls, ShowOutgoingCalls, ToggleDirection]
 );
 
-pub mod vim {
-    use gpui::actions;
-
-    actions!(
-        vim,
-        [
-            /// Opens the default keymap file.
-            OpenDefaultKeymap
-        ]
-    );
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WslConnectionOptions {
     pub distro_name: String,
