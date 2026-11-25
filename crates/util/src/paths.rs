@@ -27,7 +27,9 @@ pub use path::PathStyle;
 pub fn home_dir() -> &'static PathBuf {
     static HOME_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     HOME_DIR.get_or_init(|| {
-        if cfg!(test) {
+        // `cfg!(test)` alone is false when another crate's tests use util,
+        // which let those tests read the developer's real home directory.
+        if cfg!(any(test, feature = "test-support")) {
             if cfg!(target_os = "macos") {
                 PathBuf::from("/Users/zed")
             } else if cfg!(target_os = "windows") {

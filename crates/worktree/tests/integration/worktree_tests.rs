@@ -6224,6 +6224,21 @@ fn drain_git_repo_updates(events: &mut futures::channel::mpsc::UnboundedReceiver
     found
 }
 
+#[test]
+fn test_global_gitignore_uses_fake_home() {
+    let expected = if cfg!(target_os = "macos") {
+        "/Users/zed/.config/git/ignore"
+    } else if cfg!(target_os = "windows") {
+        "C:\\Users\\zed\\.config\\git\\ignore"
+    } else {
+        "/home/zed/.config/git/ignore"
+    };
+    assert_eq!(
+        paths::global_gitignore_path(),
+        Some(std::path::PathBuf::from(expected))
+    );
+}
+
 fn init_test(cx: &mut gpui::TestAppContext) {
     zlog::init_test();
 
