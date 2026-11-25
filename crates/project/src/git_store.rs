@@ -186,6 +186,9 @@ struct BufferGitState {
 
     head_text: Option<Arc<str>>,
     index_text: Option<Arc<str>>,
+    /// Line ending of the index blob before `index_text` was normalized to LF.
+    /// Index writes restore it, so staging a hunk does not rewrite every line.
+    index_line_ending: text::LineEnding,
     /// The optimistic, in-flight index state: the sole input to the index write,
     /// expressed relative to the currently-loaded index text (`I0`). Never shown
     /// to any view (views use per-diff pending hunks). Cleared when a
@@ -1825,10 +1828,11 @@ impl GitStore {
         let Some(diff_state) = self.diffs.get(&buffer_id) else {
             return;
         };
+        let diff_state = diff_state.read(cx);
+        let line_ending = diff_state.index_line_ending;
         let new_index_text = diff_state
-            .read(cx)
             .pending_index_text(cx)
-            .map(|rope| rope.to_string());
+            .map(|rope| text::chunks_with_line_ending(&rope, line_ending).collect::<String>());
         self.write_index_text_for_buffer_id(buffer_id, new_index_text, cx);
     }
 
@@ -5435,6 +5439,15 @@ impl GitStore {
     }
 }
 
+/// The line ending a git blob uses, judged by its first newline. A blob with
+/// no newline counts as LF, whatever the host platform.
+fn blob_line_ending(text: &str) -> text::LineEnding {
+    match text.find('\n') {
+        Some(ix) if ix > 0 && text.as_bytes()[ix - 1] == b'\r' => text::LineEnding::Windows,
+        _ => text::LineEnding::Unix,
+    }
+}
+
 impl BufferGitState {
     fn new(_git_store: WeakEntity<GitStore>, _cx: &mut Context<Self>) -> Self {
         Self {
@@ -5450,6 +5463,7 @@ impl BufferGitState {
             hunk_staging_operation_count_as_of_write: 0,
             head_text: Default::default(),
             index_text: Default::default(),
+            index_line_ending: text::LineEnding::Unix,
             pending_index_edits: Some(Vec::new()),
             oid_texts: Default::default(),
             head_text_buffer: WeakEntity::new_invalid(),
@@ -5740,6 +5754,7 @@ impl BufferGitState {
         match diff_bases_change {
             Some(DiffBasesChange::SetIndex(index)) => {
                 self.index_text = index.map(|mut index| {
+                    self.index_line_ending = blob_line_ending(&index);
                     text::LineEnding::normalize(&mut index);
                     Arc::from(index.as_str())
                 });
@@ -5754,6 +5769,7 @@ impl BufferGitState {
             }
             Some(DiffBasesChange::SetBoth(text)) => {
                 let text = text.map(|mut text| {
+                    self.index_line_ending = blob_line_ending(&text);
                     text::LineEnding::normalize(&mut text);
                     Arc::from(text.as_str())
                 });
@@ -5764,6 +5780,7 @@ impl BufferGitState {
             }
             Some(DiffBasesChange::SetEach { index, head }) => {
                 self.index_text = index.map(|mut index| {
+                    self.index_line_ending = blob_line_ending(&index);
                     text::LineEnding::normalize(&mut index);
                     Arc::from(index.as_str())
                 });

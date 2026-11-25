@@ -18325,6 +18325,84 @@ async fn test_staging_hunk_preserve_executable_permission(cx: &mut gpui::TestApp
 }
 
 #[gpui::test]
+async fn test_staging_hunk_keeps_crlf_in_index(cx: &mut gpui::TestAppContext) {
+    let index =
+        stage_hunk_and_read_index("one\r\ntwo\r\nthree\r\n", "one\r\nTWO\r\nthree\r\n", cx).await;
+    assert_eq!(index, "one\r\nTWO\r\nthree\r\n", "index blob: {index:?}");
+}
+
+/// Pins a known limit: a blob with mixed line endings is written back with
+/// the ending of its first line, so the LF on line two becomes CRLF.
+#[gpui::test]
+async fn test_staging_hunk_in_mixed_endings_uses_first_line_ending(cx: &mut gpui::TestAppContext) {
+    let index =
+        stage_hunk_and_read_index("one\r\ntwo\nthree\r\n", "one\r\ntwo\nTHREE\r\n", cx).await;
+    assert_eq!(index, "one\r\ntwo\r\nTHREE\r\n", "index blob: {index:?}");
+}
+
+/// Commits `committed` with core.autocrlf off, writes `working` to disk,
+/// stages the single resulting hunk, and returns the index blob.
+async fn stage_hunk_and_read_index(
+    committed: &str,
+    working: &str,
+    cx: &mut gpui::TestAppContext,
+) -> String {
+    init_test(cx);
+    cx.executor().allow_parking();
+    let root = TempTree::new(json!({ "project": {} }));
+    let work_dir = root.path().join("project");
+    let file_path = work_dir.join("eol.txt");
+    std::fs::write(&file_path, committed).unwrap();
+    let repo = git_init(work_dir.as_path());
+    git_stdout(&["config", "core.autocrlf", "false"], &repo);
+    git_add("eol.txt", &repo);
+    git_commit("Initial commit", &repo);
+    std::fs::write(&file_path, working).unwrap();
+
+    let project = Project::test(RealFs::new(None, cx.executor()), [root.path()], cx).await;
+    let buffer = project
+        .update(cx, |project, cx| {
+            project.open_local_buffer(file_path.as_path(), cx)
+        })
+        .await
+        .unwrap();
+    let snapshot = buffer.read_with(cx, |buffer, _| buffer.snapshot());
+    let uncommitted_diff = project
+        .update(cx, |project, cx| {
+            project.open_uncommitted_diff(buffer.clone(), cx)
+        })
+        .await
+        .unwrap();
+    cx.run_until_parked();
+    let ranges = uncommitted_diff.read_with(cx, |diff, cx| {
+        diff.snapshot(cx)
+            .hunks(&snapshot)
+            .map(|hunk| hunk.buffer_range)
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(ranges.len(), 1);
+    project
+        .update(cx, |project, cx| {
+            let unstaged_diff = uncommitted_diff.read(cx).secondary_diff().unwrap();
+            project.stage_hunks(buffer.clone(), unstaged_diff, ranges, cx)
+        })
+        .unwrap();
+    cx.run_until_parked();
+
+    // The index write runs git in a background process; wait for it to land.
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let index =
+            String::from_utf8(git_stdout(&["cat-file", "blob", ":eol.txt"], &repo)).unwrap();
+        if index != committed || std::time::Instant::now() > deadline {
+            return index;
+        }
+        cx.executor().timer(Duration::from_millis(50)).await;
+        cx.run_until_parked();
+    }
+}
+
+#[gpui::test]
 async fn test_repository_and_path_for_project_path(
     background_executor: BackgroundExecutor,
     cx: &mut gpui::TestAppContext,
@@ -22347,6 +22425,18 @@ fn assert_entry_git_state(
 
 #[cfg(any())]
 const GIT_STATUS_CONFLICTED: &str = "UU";
+
+#[expect(clippy::disallowed_methods, reason = "tests drive the real git binary")]
+#[track_caller]
+fn git_stdout(args: &[&str], work_dir: &Path) -> Vec<u8> {
+    let output = git_cmd(work_dir).args(args).output().unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    output.stdout
+}
 
 fn git_cmd(work_dir: &Path) -> Command {
     let mut cmd = Command::new("git");
