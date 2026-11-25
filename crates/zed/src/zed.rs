@@ -429,6 +429,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
     init_app_appearance(cx);
     init_reduce_motion(cx);
     init_global_config_error_notifications(cx);
+    title_bar::init(cx);
 
     cx.observe_new(|_multi_workspace: &mut MultiWorkspace, window, cx| {
         let Some(window) = window else {
@@ -3702,6 +3703,38 @@ mod tests {
                 });
             })
             .unwrap();
+    }
+
+    #[gpui::test]
+    async fn test_new_window_has_title_bar(cx: &mut TestAppContext) {
+        let app_state = init_test(cx);
+        cx.update(|cx| {
+            open_new(
+                Default::default(),
+                app_state.clone(),
+                cx,
+                |workspace, window, cx| {
+                    Editor::new_file(workspace, &Default::default(), window, cx)
+                },
+            )
+        })
+        .await
+        .unwrap();
+        cx.run_until_parked();
+
+        let multi_workspace = cx
+            .update(|cx| cx.windows().first().unwrap().downcast::<MultiWorkspace>())
+            .unwrap();
+        let has_title_bar = multi_workspace
+            .update(cx, |multi_workspace, _, cx| {
+                multi_workspace
+                    .workspace()
+                    .read(cx)
+                    .titlebar_item()
+                    .is_some_and(|item| item.downcast::<title_bar::TitleBar>().is_ok())
+            })
+            .unwrap();
+        assert!(has_title_bar, "a new window must get the Zed title bar");
     }
 
     #[gpui::test]
