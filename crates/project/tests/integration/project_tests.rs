@@ -18294,6 +18294,19 @@ async fn test_staging_hunk_preserve_executable_permission(cx: &mut gpui::TestApp
 
     cx.run_until_parked();
 
+    // The index write runs git in a background process; wait for it to land,
+    // so the mode checks below see the staged blob.
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let index = loop {
+        let index = String::from_utf8(git_stdout(&["cat-file", "blob", ":foo"], &repo)).unwrap();
+        if index != committed_contents || std::time::Instant::now() > deadline {
+            break index;
+        }
+        cx.executor().timer(Duration::from_millis(50)).await;
+        cx.run_until_parked();
+    };
+    assert_eq!(index, file_contents);
+
     let output = smol::process::Command::new("git")
         .current_dir(&work_dir)
         .args(["diff", "--staged"])
