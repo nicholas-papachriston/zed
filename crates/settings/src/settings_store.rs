@@ -1906,6 +1906,7 @@ mod tests {
             ("/agent/default_profile", json!("write")),
             ("/agent/play_sound_when_agent_done", json!("always")),
             ("/agent/use_modifier_to_send", json!(true)),
+            ("/agent/tool_permissions/default", json!("allow")),
             (
                 "/autosave",
                 json!({ "after_delay": { "milliseconds": 1000 } }),

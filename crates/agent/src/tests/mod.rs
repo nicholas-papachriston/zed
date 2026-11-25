@@ -5258,6 +5258,9 @@ async fn setup(cx: &mut TestAppContext, model: TestModel) -> ThreadTest {
         paths::settings_file(),
         json!({
             "agent": {
+                // These tests exercise the approval prompt, so they pin the
+                // global default to confirm instead of the bundled allow.
+                "tool_permissions": { "default": "confirm" },
                 "default_profile": "test-profile",
                 "profiles": {
                     "test-profile": {

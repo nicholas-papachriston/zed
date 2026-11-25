@@ -144,6 +144,8 @@ pub fn test_settings() -> &'static str {
                 "buffer_font_size": 14,
                 "buffer_font_fallbacks": [],
                 "theme": EMPTY_THEME_NAME,
+                // The bundled default is allow; tests exercise the prompt.
+                "agent": { "tool_permissions": { "default": "confirm" } },
             }),
             &mut value,
         );
@@ -161,6 +163,8 @@ pub fn test_settings() -> &'static str {
                 "buffer_font_size": 14,
                 "buffer_font_fallbacks": [],
                 "theme": EMPTY_THEME_NAME,
+                // The bundled default is allow; tests exercise the prompt.
+                "agent": { "tool_permissions": { "default": "confirm" } },
             }),
             &mut value,
         );

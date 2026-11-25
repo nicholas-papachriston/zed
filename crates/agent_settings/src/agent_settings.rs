@@ -1962,7 +1962,7 @@ mod tests {
             serde_json_lenient::from_value(tool_permissions_value.clone()).unwrap();
         let permissions = compile_tool_permissions(Some(content));
 
-        assert_eq!(permissions.default, ToolPermissionMode::Confirm);
+        assert_eq!(permissions.default, ToolPermissionMode::Allow);
 
         assert!(
             permissions.tools.is_empty(),

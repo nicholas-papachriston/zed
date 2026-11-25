@@ -2442,4 +2442,39 @@ mod tests {
         let decision = path_perm(EditFileTool::NAME, "src/../.env", &["^\\.env"], &[], &[]);
         assert!(matches!(decision, ToolPermissionDecision::Deny(_)));
     }
+
+    #[gpui::test]
+    fn bundled_default_allows_and_tool_rule_overrides(cx: &mut gpui::App) {
+        use settings::Settings as _;
+
+        let store = settings::SettingsStore::new(cx, &settings::default_settings());
+        let mut content = store.merged_settings().clone();
+        let url = vec!["https://example.com".to_string()];
+
+        let bundled = AgentSettings::from_settings(&content);
+        assert_eq!(bundled.tool_permissions.default, ToolPermissionMode::Allow);
+        assert_eq!(
+            decide_permission_from_settings(FetchTool::NAME, &url, &bundled),
+            ToolPermissionDecision::Allow
+        );
+
+        content
+            .agent
+            .get_or_insert_default()
+            .tool_permissions
+            .get_or_insert_default()
+            .tools
+            .insert(
+                FetchTool::NAME.into(),
+                settings::ToolRulesContent {
+                    default: Some(ToolPermissionMode::Confirm),
+                    ..Default::default()
+                },
+            );
+        let overridden = AgentSettings::from_settings(&content);
+        assert_eq!(
+            decide_permission_from_settings(FetchTool::NAME, &url, &overridden),
+            ToolPermissionDecision::Confirm
+        );
+    }
 }

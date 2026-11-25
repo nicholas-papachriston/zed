@@ -1074,7 +1074,7 @@ pub struct SandboxPermissionsContent {
 pub struct ToolPermissionsContent {
     /// Global default permission when no tool-specific rules match.
     /// Individual tools can override this with their own default.
-    /// Default: confirm
+    /// Default: allow
     #[serde(alias = "default_mode")]
     pub default: Option<ToolPermissionMode>,
 
